@@ -46,10 +46,8 @@
   th { background: var(--code-bg); }
   .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; }
   .hidden { display: none !important; }
-  #editorWrap { margin: 16px 0 4px; }
-  #editorLabel { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   #codeEditor {
-    width: 100%; min-height: 320px; resize: vertical; display: block;
+    width: 100%; box-sizing: border-box; display: block;
     font-family: ui-monospace, "D2Coding", Consolas, monospace; font-size: 13px;
     line-height: 1.6; padding: 14px 16px; border: 1px solid var(--border);
     border-radius: 10px; background: #1f1e1b; color: #e8e6e1;
@@ -62,10 +60,33 @@
   #stdinWrap .lbl { font-size:12px; color:var(--muted); margin-bottom:4px; }
   #stdinBox { width:100%; min-height:60px; resize:vertical; font-family:ui-monospace,Consolas,monospace;
     font-size:13px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; }
-  #workspace { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:4px;
-    align-items: start; }
-  #workspace > div { display:flex; flex-direction:column; min-width:0; }
-  #workspace textarea { box-sizing: border-box; }
+  /* ---- 문제 화면: 전체 화면 분할 레이아웃 ---- */
+  #scr-task { position: fixed; inset: 0; background: var(--bg); display: flex;
+    flex-direction: column; z-index: 10; }
+  #scr-task.hidden { display: none; }
+  #taskBar { display:flex; justify-content:space-between; align-items:center;
+    padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--panel);
+    flex-shrink: 0; gap: 12px; flex-wrap: wrap; }
+  .tb-left { display:flex; align-items:center; gap:10px; }
+  .tb-right { display:flex; gap:8px; }
+  #split { flex: 1; display: flex; min-height: 0; }
+  #descPane { width: 50%; overflow-y: auto; padding: 20px 26px;
+    border-right: 1px solid var(--border); }
+  #descPane h1 { font-size: 17px; margin: 0 0 12px; }
+  #descPane pre.body { margin: 0; }
+  #rightPane { width: 50%; display: flex; flex-direction: column; min-width: 0;
+    padding: 12px 14px; gap: 8px; }
+  #edPane { display: flex; flex-direction: column; flex: 3; min-height: 0; }
+  #edPane #codeEditor { flex: 1; min-height: 120px; resize: none; }
+  #termPane { display: flex; flex-direction: column; flex: 2; min-height: 0;
+    border-top: 1px solid var(--border); padding-top: 8px; }
+  #termPane #terminal { flex: 1; min-height: 80px; max-height: none; }
+  #codeEditor[readonly] { opacity: .55; }
+  @media (max-width: 900px){
+    #split { flex-direction: column; }
+    #descPane, #rightPane { width: 100%; }
+    #descPane { max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+  }
   @media (max-width: 900px){ #workspace { grid-template-columns: 1fr; } }
   .pane-label { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex;
     justify-content:space-between; align-items:center; }
@@ -117,24 +138,34 @@
       <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다.</span></p>
       <button id="btnShow" class="primary" style="font-size:16px; padding:14px 34px;">문제 보기</button>
       <div id="pyLoadStatus" class="muted" style="margin-top:14px;"></div>
+      <div style="margin-top:26px;">
+        <button id="btnEndSession" class="ghost">여기까지 풀고 세션 종료</button>
+      </div>
     </div>
   </section>
 
   <!-- ============ 3. 문제 화면 ============ -->
   <section id="scr-task" class="hidden">
-    <div class="row" style="justify-content:space-between;">
-      <div>
+    <div id="taskBar">
+      <div class="tb-left">
         <span class="badge" id="taskBadge"></span>
         <span class="progress" id="taskProgress"></span>
+        <span class="phase" id="phaseLabel">단계: 문제 파악</span>
       </div>
-      <div class="phase" id="phaseLabel">단계: 문제 파악</div>
+      <div class="tb-right">
+        <button id="btnSolve" class="primary">풀이 시작</button>
+        <button id="btnDone" class="primary hidden">완료</button>
+        <button id="btnGiveup" class="ghost">포기</button>
+      </div>
     </div>
-    <h1 id="taskTitle" style="font-size:17px; margin-top:10px;"></h1>
-    <pre class="body" id="taskBody"></pre>
-    <div id="editorWrap" class="hidden">
-      <div id="workspace">
-        <div>
-          <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 실행)</span></div>
+    <div id="split">
+      <div id="descPane">
+        <h1 id="taskTitle"></h1>
+        <pre class="body" id="taskBody"></pre>
+      </div>
+      <div id="rightPane">
+        <div id="edPane">
+          <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 실행)</span><span id="edLock" class="muted">풀이 시작을 누르면 편집 가능</span></div>
           <textarea id="codeEditor" spellcheck="false" placeholder="# 여기에 코드를 작성하세요"></textarea>
           <div id="stdinWrap" class="hidden">
             <div class="lbl">표준 입력 (stdin) — input()이 이 내용을 읽습니다</div>
@@ -145,16 +176,11 @@
             <span id="runStatus"></span>
           </div>
         </div>
-        <div>
-          <div class="pane-label"><span>출력 (terminal)</span><button id="btnClearTerm">지우기</button></div>
+        <div id="termPane">
+          <div class="pane-label"><span>TERMINAL</span><button id="btnClearTerm">지우기</button></div>
           <pre id="terminal"></pre>
         </div>
       </div>
-    </div>
-    <div class="row">
-      <button id="btnSolve" class="primary">풀이 시작</button>
-      <button id="btnDone" class="primary hidden">완료</button>
-      <button id="btnGiveup" class="ghost">포기</button>
     </div>
   </section>
 
@@ -188,7 +214,7 @@
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
 let tasks = [], order = [], results = [], cur = -1;
-let userId = '';
+let userId = '', sessionTs = 0;
 let t_shown = 0, t_solve = 0, hiddenMs = 0, hiddenSince = 0, t_firstKey = 0;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
@@ -216,14 +242,24 @@ function buildOrder(tasks, uid){
   const seed = xmur3(uid)();
   const rnd = mulberry32(seed);
   const sources = ['APPS','DS-1000','BugsInPy'];
-  const rot = seed % 3;                      // 블록 순서 회전 (라틴 방진식)
-  const blockOrder = sources.slice(rot).concat(sources.slice(0,rot));
+  const pools = {};
+  for (const s of sources)
+    pools[s] = seededShuffle(tasks.map((t,i)=>({t,i})).filter(x=>x.t.source===s).map(x=>x.i), rnd);
+  const rot = seed % 3;
+  const nSets = Math.min(...sources.map(s => pools[s].length));
   let idxs = [];
-  for (const s of blockOrder){
-    const block = tasks.map((t,i)=>({t,i})).filter(x=>x.t.source===s).map(x=>x.i);
-    idxs = idxs.concat(seededShuffle(block, rnd));  // 블록 내 셔플
+  for (let k = 0; k < nSets; k++){
+    // 세트마다 소스 순서 회전 (참가자별 시작점도 상이) → 순서 효과 상쇄
+    const r = (rot + k) % 3;
+    const inSet = sources.slice(r).concat(sources.slice(0, r));
+    for (const s of inSet) idxs.push(pools[s][k]);
   }
+  for (const s of sources) idxs = idxs.concat(pools[s].slice(nSets)); // 소스 불균형 잔여분
   return idxs;
+}
+
+function setLabel(pos){
+  return `세트 ${Math.floor(pos/3)+1} · ${pos%3+1}/3  (전체 ${pos+1}/${order.length})`;
 }
 
 /* ---------- 참가자용 본문 (BugsInPy는 정답 제거) ---------- */
@@ -236,7 +272,7 @@ function participantBody(t){
       if (i !== -1) text = text.slice(0, i).trimEnd();
     }
     if (t.starter_code)
-      text += '\n\n──────── 코드 (풀이 시작을 누르면 에디터에 복사됩니다) ────────\n\n' + t.starter_code;
+      text += '\n\n(오른쪽 에디터의 코드에서 버그를 찾아 직접 수정한 뒤 「완료」를 누르세요.)';
   }
   return text;
 }
@@ -275,13 +311,14 @@ $('#btnStart').onclick = () => {
   userId = $('#userId').value.trim();
   order = buildOrder(tasks, userId);
   results = []; cur = -1;
+  sessionTs = Date.now();
   nextTask();
 };
 
 function nextTask(){
   cur++;
   if (cur >= order.length){ finish(); return; }
-  $('#readyProgress').textContent = `참가자 ${userId} · 문제 ${cur+1} / ${order.length}`;
+  $('#readyProgress').textContent = `참가자 ${userId} · ${setLabel(cur)}`;
   $('#btnShow').disabled = false;
   show('scr-ready');
 }
@@ -290,21 +327,23 @@ $('#btnShow').onclick = () => {
   const t = tasks[order[cur]];
   $('#taskBadge').className = 'badge b-'+t.source;
   $('#taskBadge').textContent = t.source;
-  $('#taskProgress').textContent = ` ${cur+1} / ${order.length}`;
+  $('#taskProgress').textContent = ` ${setLabel(cur)}`;
   $('#taskTitle').textContent = t.title_ko || t.title || t.id;
   const body = $('#taskBody');
   body.textContent = participantBody(t);
   body.classList.toggle('mono', t.source !== 'APPS');
   $('#btnSolve').classList.remove('hidden');
   $('#btnDone').classList.add('hidden');
-  $('#editorWrap').classList.add('hidden');
-  $('#codeEditor').value = t.starter_code || '';
+  const ed = $('#codeEditor');
+  ed.value = t.starter_code || '';
+  ed.readOnly = true;
+  $('#edLock').classList.remove('hidden');
   $('#stdinBox').value = '';
-  $('#runRow').classList.toggle('hidden', t.source === 'BugsInPy');  // 스니펫은 의존성 때문에 실행 불가
   $('#terminal').innerHTML = '';
   $('#runStatus').textContent = '';
   runCount = 0; lastRunOk = null;
   $('#stdinWrap').classList.toggle('hidden', t.source !== 'APPS');
+  $('#runRow').classList.toggle('hidden', t.source === 'BugsInPy');
   $('#phaseLabel').textContent = '단계: 문제 파악';
   t_shown = Date.now(); t_solve = 0; hiddenMs = 0; hiddenSince = 0; t_firstKey = 0;
   show('scr-task');
@@ -314,7 +353,8 @@ $('#btnSolve').onclick = () => {
   t_solve = Date.now();
   $('#btnSolve').classList.add('hidden');
   $('#btnDone').classList.remove('hidden');
-  $('#editorWrap').classList.remove('hidden');
+  $('#codeEditor').readOnly = false;
+  $('#edLock').classList.add('hidden');
   $('#phaseLabel').textContent = '단계: 풀이 중';
   $('#codeEditor').focus();
 };
@@ -341,6 +381,8 @@ function endTask(status){
   results.push({
     user_id: userId,
     order_index: cur + 1,
+    set_index: Math.floor(cur/3) + 1,
+    pos_in_set: cur % 3 + 1,
     task_id: t.id, source: t.source, group: t.group, difficulty: t.difficulty,
     shown_at: new Date(t_shown).toISOString(),
     solve_started_at: t_solve ? new Date(t_solve).toISOString() : '',
@@ -374,8 +416,14 @@ function endTask(status){
 
 $('#btnRateNext').onclick = () => {
   results[results.length-1].rating = pendingRating;
+  submitResults(false);   // 문제마다 서버에 증분 저장 (같은 세션 파일 덮어쓰기)
   nextTask();
 };
+
+$('#btnEndSession') && ($('#btnEndSession').onclick = () => {
+  if (!results.length){ alert('아직 완료한 문제가 없습니다.'); return; }
+  if (confirm(`지금까지 ${results.length}개 문제의 기록으로 세션을 종료할까요?`)) finish();
+});
 
 /* ---------- 탭 이탈 시간 측정 ---------- */
 document.addEventListener('visibilitychange', () => {
@@ -397,23 +445,25 @@ function finish(){
     }).join('')+'</tr>').join('');
   show('scr-end');
   downloadJson(); // 로컬 백업 저장
-  submitResults();
+  submitResults(true);
 }
 
-async function submitResults(){
+async function submitResults(final){
   if (execMode !== 'server') return;
   try {
     const r = await fetch('submit', {
       method:'POST',
       headers: {'Content-Type':'application/json', ...authHeaders()},
-      body: JSON.stringify({user_id: userId, results})
+      body: JSON.stringify({user_id: userId, session: sessionTs, results})
     });
     const j = await r.json();
-    const el = document.createElement('p');
-    el.className = 'muted';
-    el.textContent = j.ok ? `✓ 서버에 저장됨 (${j.saved})` : `⚠ 서버 저장 실패: ${j.out || ''} — 다운로드 파일을 보관하세요`;
-    $('#scr-end .muted').after(el);
-  } catch (e){ /* 로컬 다운로드가 백업 */ }
+    if (final){
+      const el = document.createElement('p');
+      el.className = 'muted';
+      el.textContent = j.ok ? `✓ 서버에 저장됨 (${j.saved})` : `⚠ 서버 저장 실패: ${j.out || ''} — 다운로드 파일을 보관하세요`;
+      $('#scr-end .muted').after(el);
+    }
+  } catch (e){ /* 최종 시점에는 로컬 다운로드가 백업 */ }
 }
 
 function dl(name, content, type){

@@ -99,7 +99,9 @@ class QuietHandler(SimpleHTTPRequestHandler):
             payload = json.loads(self.rfile.read(n).decode("utf-8"))
             uid = re.sub(r"[^A-Za-z0-9_\-]", "_", str(payload.get("user_id", "unknown")))[:40]
             RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-            fname = RESULTS_DIR / f"{uid}_{int(time.time())}.json"
+            session = re.sub(r"[^0-9]", "", str(payload.get("session", "")))[:16]
+            fname = RESULTS_DIR / (f"{uid}_{session}.json" if session
+                                   else f"{uid}_{int(time.time())}.json")
             fname.write_text(json.dumps(payload.get("results", []),
                              ensure_ascii=False, indent=2), encoding="utf-8")
             self._json(200, {"ok": True, "saved": fname.name})
