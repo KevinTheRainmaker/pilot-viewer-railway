@@ -249,6 +249,21 @@ $('#file').addEventListener('change', async e => {
   updateStartBtn();
 });
 $('#userId').addEventListener('input', updateStartBtn);
+
+// 서버가 tasks.json을 호스팅하면 자동 로드 (수동 업로드로 덮어쓰기 가능)
+(async () => {
+  if (!location.protocol.startsWith('http')) return;
+  try {
+    const r = await fetch('tasks.json', {cache:'no-store'});
+    if (!r.ok) return;
+    const j = await r.json();
+    if (Array.isArray(j) && j.length && !tasks.length){
+      tasks = j;
+      $('#loadStatus').textContent = `${tasks.length}개 문제 자동 로드됨 (서버)`;
+      updateStartBtn();
+    }
+  } catch (e) { /* 수동 업로드로 진행 */ }
+})();
 function updateStartBtn(){
   $('#btnStart').disabled = !(tasks.length && $('#userId').value.trim());
 }
@@ -257,7 +272,7 @@ $('#btnStart').onclick = () => {
   userId = $('#userId').value.trim();
   order = buildOrder(tasks, userId);
   results = []; cur = -1;
-  if (!pyWorker) spawnWorker();   // (페이지 로드시 이미 시작됨 — 안전장치)
+  if (execMode === 'pyodide' && !pyWorker) spawnWorker();  // Pyodide 모드에서만
   nextTask();
 };
 
@@ -527,6 +542,7 @@ function spawnWorker(){
     pyWorker = new Worker(URL.createObjectURL(blob));
     pyWorker.onerror = () => { if (!pyReady) enterFallback(); };
     pyWorker.onerror = err => {
+    if (execMode === 'server') return;  // 서버 모드에서는 워커 상태 무시
     pyFailed = true;
     onPyProgress('⚠ Python 로딩 실패: ' + (err.message || 'importScripts 오류') + ' — 실행 기능 없이 진행 가능합니다');
     onPyReadyChanged();
