@@ -215,7 +215,7 @@ const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
 let tasks = [], order = [], results = [], cur = -1;
 let userId = '', sessionTs = 0;
-let t_shown = 0, t_solve = 0, hiddenMs = 0, hiddenSince = 0, t_firstKey = 0;
+let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
 
@@ -345,7 +345,7 @@ $('#btnShow').onclick = () => {
   $('#stdinWrap').classList.toggle('hidden', t.source !== 'APPS');
   $('#runRow').classList.toggle('hidden', t.source === 'BugsInPy');
   $('#phaseLabel').textContent = '단계: 문제 파악';
-  t_shown = Date.now(); t_solve = 0; hiddenMs = 0; hiddenSince = 0; t_firstKey = 0;
+  t_shown = Date.now(); t_solve = 0; awayMs = 0; awaySince = 0; t_firstKey = 0;
   show('scr-task');
 };
 
@@ -390,7 +390,7 @@ function endTask(status){
     comprehension_sec: t_solve ? +((t_solve - t_shown)/1000).toFixed(1) : '',
     solving_sec: t_solve ? +((now - t_solve)/1000).toFixed(1) : '',
     total_sec: +((now - t_shown)/1000).toFixed(1),
-    tab_hidden_sec: +((hiddenMs + (hiddenSince ? now - hiddenSince : 0))/1000).toFixed(1),
+    unfocused_sec: +((awayMs + (awaySince ? now - awaySince : 0))/1000).toFixed(1),
     time_to_first_keystroke_sec: t_firstKey ? +((t_firstKey - t_solve)/1000).toFixed(1) : '',
     status: status,
     rating: null,
@@ -426,17 +426,27 @@ $('#btnEndSession') && ($('#btnEndSession').onclick = () => {
 });
 
 /* ---------- 탭 이탈 시간 측정 ---------- */
-document.addEventListener('visibilitychange', () => {
-  if ($('#scr-task').classList.contains('hidden')) return;
-  if (document.hidden) hiddenSince = Date.now();
-  else if (hiddenSince){ hiddenMs += Date.now() - hiddenSince; hiddenSince = 0; }
-});
+/* away = 탭 숨김 ∪ 창 포커스 상실. 겹침 이중계산 없이 상태 전이로 누적 */
+function isAway(){ return document.hidden || !document.hasFocus(); }
+function updateAway(){
+  if ($('#scr-task').classList.contains('hidden')){
+    // 문제 화면 밖에서는 진행 중인 away 구간만 마감
+    if (awaySince){ awayMs += Date.now() - awaySince; awaySince = 0; }
+    return;
+  }
+  const away = isAway();
+  if (away && !awaySince) awaySince = Date.now();
+  else if (!away && awaySince){ awayMs += Date.now() - awaySince; awaySince = 0; }
+}
+document.addEventListener('visibilitychange', updateAway);
+window.addEventListener('blur', () => setTimeout(updateAway, 0));   // hasFocus 갱신 후 판정
+window.addEventListener('focus', () => setTimeout(updateAway, 0));
 
 /* ---------- 종료 / 내보내기 ---------- */
 function finish(){
   const tb = $('#summary');
-  const cols = ['order_index','task_id','source','status','comprehension_sec','solving_sec','total_sec','tab_hidden_sec','rating','code_chars'];
-  const head = ['순서','문제 ID','소스','상태','이해(초)','풀이(초)','총(초)','이탈(초)','난이도','코드(자)'];
+  const cols = ['order_index','task_id','source','status','comprehension_sec','solving_sec','total_sec','unfocused_sec','rating','code_chars'];
+  const head = ['순서','문제 ID','소스','상태','이해(초)','풀이(초)','총(초)','포커스 이탈(초)','난이도','코드(자)'];
   tb.innerHTML = '<tr>'+head.map(h=>`<th>${h}</th>`).join('')+'</tr>' +
     results.map(r=>'<tr>'+cols.map(c=>{
       let v = r[c] ?? '';
