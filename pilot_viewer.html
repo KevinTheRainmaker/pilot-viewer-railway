@@ -49,7 +49,7 @@
   #editorWrap { margin: 16px 0 4px; }
   #editorLabel { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   #codeEditor {
-    width: 100%; min-height: 320px; height: 100%; resize: vertical;
+    width: 100%; min-height: 320px; resize: vertical; display: block;
     font-family: ui-monospace, "D2Coding", Consolas, monospace; font-size: 13px;
     line-height: 1.6; padding: 14px 16px; border: 1px solid var(--border);
     border-radius: 10px; background: #1f1e1b; color: #e8e6e1;
@@ -62,7 +62,10 @@
   #stdinWrap .lbl { font-size:12px; color:var(--muted); margin-bottom:4px; }
   #stdinBox { width:100%; min-height:60px; resize:vertical; font-family:ui-monospace,Consolas,monospace;
     font-size:13px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; }
-  #workspace { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:4px; }
+  #workspace { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:4px;
+    align-items: start; }
+  #workspace > div { display:flex; flex-direction:column; min-width:0; }
+  #workspace textarea { box-sizing: border-box; }
   @media (max-width: 900px){ #workspace { grid-template-columns: 1fr; } }
   .pane-label { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex;
     justify-content:space-between; align-items:center; }
@@ -272,7 +275,6 @@ $('#btnStart').onclick = () => {
   userId = $('#userId').value.trim();
   order = buildOrder(tasks, userId);
   results = []; cur = -1;
-  if (execMode === 'pyodide' && !pyWorker) spawnWorker();  // Pyodide 모드에서만
   nextTask();
 };
 
@@ -280,8 +282,7 @@ function nextTask(){
   cur++;
   if (cur >= order.length){ finish(); return; }
   $('#readyProgress').textContent = `참가자 ${userId} · 문제 ${cur+1} / ${order.length}`;
-  $('#btnShow').disabled = !(pyCoreReady || pyFailed);
-  if (!pyCoreReady && !pyFailed) $('#pyLoadStatus').textContent = 'Python 코어 준비 중… (수 초) 완료되면 버튼이 활성화됩니다.';
+  $('#btnShow').disabled = false;
   show('scr-ready');
 }
 
@@ -432,172 +433,60 @@ $('#btnCsv').onclick = () => {
   dl(`pilot_${userId}_${Date.now()}.csv`, csv, 'text/csv');
 };
 
-/* ---------- Pyodide 실행기 (Web Worker + 타임아웃) ---------- */
-const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
-let PYODIDE_URL = PYODIDE_CDN;  // resolvePyodideUrl()이 로컬 파일을 찾으면 교체
-const RUN_TIMEOUT_MS = 20000;
-let pyWorker = null, pyCoreReady = false, pyReady = false, runBusy = false, pyFailed = false;
-let pySource = '';
+/* ---------- 코드 실행 (서버 전용) ---------- */
+const RUN_TIMEOUT_SEC = 20;
+let execMode = 'none';           // 'server' | 'none'
+let serverInfo = '';
+let runBusy = false;
 
-function onPyProgress(msg){
+function setStatus(msg){
   for (const id of ['#pyLoadStatus','#introPyStatus']){
     const el = $(id); if (el) el.textContent = msg;
   }
 }
-function onPyReadyChanged(){
-  const btn = $('#btnShow'), el = $('#pyLoadStatus');
-  if (pyCoreReady){
-    btn.disabled = false;   // 코어만 준비되면 세션 진행 가능; 패키지는 백그라운드
-    if (pyReady && el) el.textContent = '';
-  } else if (pyFailed){
-    btn.disabled = false;  // 실행 없이라도 세션은 진행 가능해야 함
-    if (el) el.textContent = '⚠ Python 로딩 실패 — 실행 기능 없이 진행합니다 (네트워크 확인)';
-  }
+function onServerStateChanged(){
+  const btn = $('#btnShow');
+  if (btn) btn.disabled = false;   // 세션 진행은 서버 상태와 무관하게 가능
 }
 
-const workerSrc = () => `
-importScripts('${PYODIDE_URL}');
-let pyodide = null, pkgPromise = null;
-async function init(){
+async function probeServer(timeoutMs){
+  if (!location.protocol.startsWith('http')) return false;
   try {
-    const t0 = Date.now();
-    postMessage({type:'progress', msg:'Python 코어 로딩 중…'});
-    pyodide = await loadPyodide({indexURL: '${PYODIDE_URL}'.replace(/pyodide\.js$/, '')});
-    postMessage({type:'coreready', ms: Date.now() - t0});
-    // numpy/pandas는 백그라운드: 휠 로드 + 최초 import까지 미리 수행 (첫 실행 지연 제거)
-    pkgPromise = (async () => {
-      await pyodide.loadPackage(['numpy','pandas'], {messageCallback: ()=>{}});
-      await pyodide.runPythonAsync('import numpy, pandas');
-    })();
-    await pkgPromise;
-    postMessage({type:'ready', ms: Date.now() - t0});
-  } catch (err){
-    postMessage({type:'initerror', msg:String(err)});
-  }
-}
-init();
-onmessage = async (e) => {
-  const {code, stdin} = e.data;
-  if (!pyodide){ postMessage({type:'result', ok:false, out:'(Python 초기화 전입니다)'}); return; }
-  if (pkgPromise){ try { await pkgPromise; } catch(e){} }
-  let out = '';
-  pyodide.setStdout({batched: s => { out += s + '\n'; }});
-  pyodide.setStderr({batched: s => { out += s + '\n'; }});
-  try {
-    await pyodide.loadPackagesFromImports(code, {messageCallback: ()=>{}});
-    pyodide.globals.set('__stdin_text', stdin || '');
-    await pyodide.runPythonAsync(
-      'import sys, io\nsys.stdin = io.StringIO(__stdin_text)\n'
-    );
-    await pyodide.runPythonAsync(code);
-    postMessage({type:'result', ok:true, out});
-  } catch (err){
-    postMessage({type:'result', ok:false, out: out + String(err)});
-  }
-};
-`;
-
-let fallbackMode = false, pyodideMain = null;
-
-async function resolvePyodideUrl(){
-  // 로컬 서버로 서빙 중이면 ./pyodide/pyodide.js 를 우선 사용 (setup_local_pyodide.py 참조)
-  if (location.protocol.startsWith('http')){
-    try {
-      const local = new URL('pyodide/pyodide.js', location.href).href;
-      const r = await fetch(local, {method:'HEAD'});
-      if (r.ok){ PYODIDE_URL = local; pySource = '로컬'; return; }
-    } catch (e) { /* fall through to CDN */ }
-  }
-  PYODIDE_URL = PYODIDE_CDN; pySource = 'CDN';
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), timeoutMs || 4000);
+    const r = await fetch('ping', {cache:'no-store', signal: ctrl.signal});
+    clearTimeout(to);
+    const j = await r.json();
+    if (j.service !== 'pilot-runner') return false;
+    if (j.token_required && !TOKEN){
+      setStatus('⚠ 이 서버는 토큰이 필요합니다 — 접속 URL 끝에 ?token=... 을 붙여주세요');
+      return false;
+    }
+    execMode = 'server';
+    serverInfo = 'Python ' + (j.python || '');
+    setStatus(`실행 환경 준비 완료 [서버 ${serverInfo}]`);
+    onServerStateChanged();
+    return true;
+  } catch (e){ return false; }
 }
 
-// 실행 백엔드 결정: 로컬 서버(/run) 우선, 없으면 Pyodide fallback
-let execMode = 'none';
 (async () => {
-  if (location.protocol.startsWith('http')){
-    try {
-      const r = await fetch('ping', {cache:'no-store'});
-      const j = await r.json();
-      if (j.service === 'pilot-runner'){
-        if (j.token_required && !TOKEN){
-          onPyProgress('⚠ 이 서버는 토큰이 필요합니다 — 접속 URL 끝에 ?token=... 을 붙여주세요');
-        }
-        execMode = 'server';
-        pyCoreReady = true; pyReady = true; pySource = '로컬 Python ' + (j.python || '');
-        onPyProgress(`Python 준비 완료 [${pySource}]`);
-        onPyReadyChanged();
-        return;
-      }
-    } catch (e) { /* run_viewer.py가 아닌 서버 — fallback */ }
+  if (!location.protocol.startsWith('http')){
+    setStatus('⚠ 파일을 직접 연 상태(file://)입니다 — 서버 URL로 접속해야 코드 실행이 가능합니다');
+    onServerStateChanged();
+    return;
   }
-  execMode = 'pyodide';
-  await resolvePyodideUrl();
-  spawnWorker();
+  setStatus('실행 서버 확인 중…');
+  for (const wait of [0, 3000, 3000, 4000]){   // 콜드 스타트 대비 재시도
+    if (wait) await new Promise(res => setTimeout(res, wait));
+    if (await probeServer(5000)) return;
+    setStatus('실행 서버 응답 대기 중… (콜드 스타트일 수 있음)');
+  }
+  setStatus('⚠ 실행 서버를 찾을 수 없습니다 — 새로고침하거나 서버 상태를 확인하세요 (실행 버튼을 누르면 재시도합니다)');
+  onServerStateChanged();
 })();
 
-function spawnWorker(){
-  pyReady = false; pyCoreReady = false;
-  try {
-    const blob = new Blob([workerSrc()], {type:'application/javascript'});
-    pyWorker = new Worker(URL.createObjectURL(blob));
-    pyWorker.onerror = () => { if (!pyReady) enterFallback(); };
-    pyWorker.onerror = err => {
-    if (execMode === 'server') return;  // 서버 모드에서는 워커 상태 무시
-    pyFailed = true;
-    onPyProgress('⚠ Python 로딩 실패: ' + (err.message || 'importScripts 오류') + ' — 실행 기능 없이 진행 가능합니다');
-    onPyReadyChanged();
-  };
-  pyWorker.onmessage = e => {
-      if (e.data.type === 'ready'){ pyReady = true; if (!runBusy) $('#runStatus').textContent = 'Python 준비됨'; }
-      else if (e.data.type === 'result') onRunResult(e.data);
-    };
-  } catch (err) {
-    enterFallback();
-  }
-}
-
-function enterFallback(){
-  fallbackMode = true;
-  pyWorker = null;
-  $('#runStatus').textContent = '⚠ 제한 모드: 이 환경에서는 실행 격리가 불가합니다. 무한 루프 시 페이지가 멈출 수 있으니, 가급적 파일을 로컬에 저장해 열어주세요.';
-}
-
-async function ensurePyodideMain(){
-  if (pyodideMain) return pyodideMain;
-  if (!window.loadPyodide){
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = PYODIDE_URL; s.onload = res; s.onerror = () => rej(new Error('Pyodide 로드 실패'));
-      document.head.appendChild(s);
-    });
-  }
-  pyodideMain = await loadPyodide();
-  return pyodideMain;
-}
-
-async function runOnMainThread(code, stdin){
-  try {
-    const py = await ensurePyodideMain();
-    let out = '';
-    py.setStdout({batched: s => { out += s + '\n'; }});
-    py.setStderr({batched: s => { out += s + '\n'; }});
-    try {
-      await py.loadPackagesFromImports(code, {messageCallback: ()=>{}});
-      py.globals.set('__stdin_text', stdin || '');
-      await py.runPythonAsync('import sys, io\nsys.stdin = io.StringIO(__stdin_text)\n');
-      await py.runPythonAsync(code);
-      onRunResult({ok:true, out});
-    } catch (err){
-      onRunResult({ok:false, out: out + String(err)});
-    }
-  } catch (err){
-    onRunResult({ok:false, out: '실행 환경 초기화 실패: ' + err.message});
-  }
-}
-
-let runTimer = null, resultHandler = null;
 function onRunResult(data){
-  if (runTimer){ clearTimeout(runTimer); runTimer = null; }
   runBusy = false;
   $('#btnRun').disabled = false;
   $('#runStatus').textContent = '';
@@ -606,43 +495,37 @@ function onRunResult(data){
   lastRunOk = data.ok;
 }
 
-$('#btnRun').onclick = () => {
+$('#btnRun').onclick = async () => {
   if (runBusy) return;
   const code = $('#codeEditor').value;
   if (!code.trim()) return;
-  if (!pyWorker && !fallbackMode) spawnWorker();
   runCount++;
   if (!t_firstKey) t_firstKey = Date.now();
-  runBusy = true;
-  $('#btnRun').disabled = true;
-  if (pyFailed){ runBusy=false; $('#btnRun').disabled=false;
-    onRunResult({ok:false, out:'(Python 환경을 사용할 수 없습니다 — 네트워크를 확인하세요)'}); return; }
-  $('#runStatus').textContent = pyReady ? '실행 중…' :
-    (pyCoreReady ? '수치 패키지 로딩을 기다리는 중…' : 'Python 재로딩 중… 잠시만 기다려주세요');
-  const send = () => {
-    $('#runStatus').textContent = '실행 중…';
-    pyWorker.postMessage({code, stdin: $('#stdinBox').value});
-    runTimer = setTimeout(() => {
-      // 무한 루프 등: 워커 강제 종료 후 재기동
-      pyWorker.terminate(); pyWorker = null;
-      onRunResult({ok:false, out:`(시간 초과: ${RUN_TIMEOUT_MS/1000}초 — 무한 루프 여부를 확인하세요. 다음 실행 시 Python이 다시 로딩됩니다)`});
-      spawnWorker();
-    }, RUN_TIMEOUT_MS);
-  };
-  if (fallbackMode){
-    $('#runStatus').textContent = '실행 중… (제한 모드)';
-    runOnMainThread(code, $('#stdinBox').value);
+  termAppend(`$ python solution.py   # run ${runCount}\n`, 't-cmd');
+
+  // 서버가 늦게 깨어난 경우: 실행 시점 재확인
+  if (execMode !== 'server'){
+    $('#runStatus').textContent = '실행 서버 확인 중…';
+    await probeServer(4000);
+  }
+  if (execMode !== 'server'){
+    onRunResult({ok:false, out:'(실행 서버에 연결할 수 없습니다 — 서버 URL로 접속했는지, 서버가 켜져 있는지 확인하세요)'});
     return;
   }
-  if (pyReady) send();
-  else {
-    let waited = 0;
-    const wait = setInterval(() => {
-      if (fallbackMode){ clearInterval(wait); $('#btnRun').disabled = false; runBusy = false; return; }
-      if (pyReady){ clearInterval(wait); send(); }
-      else if ((waited += 200) > 90000){ clearInterval(wait);
-        onRunResult({ok:false, out:'Python 로딩이 90초를 초과했습니다. 네트워크를 확인하세요.'}); }
-    }, 200);
+
+  runBusy = true;
+  $('#btnRun').disabled = true;
+  $('#runStatus').textContent = '실행 중…';
+  try {
+    const r = await fetch('run', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', ...authHeaders()},
+      body: JSON.stringify({code, stdin: $('#stdinBox').value, timeout: RUN_TIMEOUT_SEC})
+    });
+    onRunResult(await r.json());
+  } catch (err){
+    execMode = 'none';   // 다음 실행 때 재탐지
+    onRunResult({ok:false, out:'(실행 요청 실패 — 네트워크 또는 서버 상태를 확인하세요)'});
   }
 };
 
