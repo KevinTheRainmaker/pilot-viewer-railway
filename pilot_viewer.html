@@ -486,6 +486,19 @@ async function probeServer(timeoutMs){
   onServerStateChanged();
 })();
 
+function termAppend(text, cls){
+  const term = $('#terminal');
+  const span = document.createElement('span');
+  span.className = cls || '';
+  span.textContent = text;
+  term.appendChild(span);
+  term.scrollTop = term.scrollHeight;
+}
+$('#btnClearTerm').onclick = () => { $('#terminal').innerHTML = ''; };
+$('#codeEditor').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); $('#btnRun').click(); }
+});
+
 function onRunResult(data){
   runBusy = false;
   $('#btnRun').disabled = false;

@@ -55,6 +55,12 @@ class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def end_headers(self):
+        # HTML/JSON은 항상 최신본 강제 (배포 갱신이 참가자 브라우저 캐시에 막히는 것 방지)
+        if self.path.split("?")[0].endswith((".html", ".json")) or self.path in ("/", ""):
+            self.send_header("Cache-Control", "no-store, must-revalidate")
+        super().end_headers()
+
     def _json(self, code, obj):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
