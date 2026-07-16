@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>파일럿 과제 뷰어 — 시간 측정</title>
+<style>
+  :root {
+    --bg: #f7f6f3; --panel: #fff; --border: #e2ded6; --text: #2b2a27;
+    --muted: #8a857b; --accent: #b0530f; --accent-soft: #fdf0e5;
+    --code-bg: #f3f1ec; --ok: #2f6f4f; --bad: #a04040;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Pretendard","Noto Sans KR",-apple-system,sans-serif;
+         background:var(--bg); color:var(--text); min-height:100vh; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .muted { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+          padding: 24px; margin-top: 18px; }
+  input[type=text] { font: inherit; padding: 10px 12px; border: 1px solid var(--border);
+          border-radius: 8px; width: 100%; max-width: 320px; }
+  button { font: inherit; font-size: 14px; padding: 10px 20px; border-radius: 9px;
+           border: 1px solid var(--border); background: var(--panel); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.ghost { color: var(--muted); }
+  button:disabled { opacity: .4; cursor: default; }
+  label.filebtn { display:inline-block; font-size:14px; padding:10px 20px; border-radius:9px;
+           border:1px solid var(--border); background:var(--panel); cursor:pointer; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 9px;
+           border-radius:99px; color:#fff; }
+  .b-APPS{background:#2f6f4f;} .b-DS-1000{background:#3b5fa0;} .b-BugsInPy{background:#a04040;}
+  .progress { font-size: 13px; color: var(--muted); }
+  pre.body { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px;
+             padding: 20px; white-space: pre-wrap; word-break: break-word;
+             font-size: 14px; line-height: 1.7; margin: 16px 0; }
+  pre.body.mono { font-family: ui-monospace,"D2Coding",Consolas,monospace; font-size: 13px; }
+  .phase { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .rating { display: flex; gap: 8px; margin: 12px 0 4px; }
+  .rating button { width: 46px; padding: 10px 0; }
+  .rating button.sel { background: var(--accent-soft); border-color: var(--accent);
+                       color: var(--accent); font-weight: 700; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 12px; }
+  th, td { border: 1px solid var(--border); padding: 6px 9px; text-align: left; }
+  th { background: var(--code-bg); }
+  .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; }
+  .hidden { display: none !important; }
+  #editorWrap { margin: 16px 0 4px; }
+  #editorLabel { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  #codeEditor {
+    width: 100%; min-height: 320px; height: 100%; resize: vertical;
+    font-family: ui-monospace, "D2Coding", Consolas, monospace; font-size: 13px;
+    line-height: 1.6; padding: 14px 16px; border: 1px solid var(--border);
+    border-radius: 10px; background: #1f1e1b; color: #e8e6e1;
+    tab-size: 4; outline: none;
+  }
+  #codeEditor:focus { border-color: var(--accent); }
+  #runRow { display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  #runStatus { font-size:12px; color:var(--muted); }
+  #stdinWrap { margin-top:10px; }
+  #stdinWrap .lbl { font-size:12px; color:var(--muted); margin-bottom:4px; }
+  #stdinBox { width:100%; min-height:60px; resize:vertical; font-family:ui-monospace,Consolas,monospace;
+    font-size:13px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; }
+  #workspace { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:4px; }
+  @media (max-width: 900px){ #workspace { grid-template-columns: 1fr; } }
+  .pane-label { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex;
+    justify-content:space-between; align-items:center; }
+  .pane-label button { font-size:11px; padding:3px 10px; }
+  #terminal { background:#111; color:#cfcfcf; border-radius:10px; padding:12px 14px;
+    font-family:ui-monospace,"D2Coding",Consolas,monospace; font-size:12.5px;
+    white-space:pre-wrap; word-break:break-word; min-height:260px; max-height:420px;
+    overflow-y:auto; border:1px solid #000; }
+  #terminal .t-cmd { color:#8ab4f8; }
+  #terminal .t-ok { color:#d8f2d8; }
+  #terminal .t-err { color:#f2b8b8; }
+  #terminal .t-sys { color:#777; font-style:italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ 1. 시작 화면 ============ -->
+  <section id="scr-intro">
+    <h1>파일럿 과제 세션</h1>
+    <p class="muted">참가자 ID를 입력하고 tasks.json을 불러온 뒤 세션을 시작하세요.<br>
+    문제 제시 순서는 참가자 ID에 따라 자동으로 결정됩니다 (같은 ID = 같은 순서).</p>
+    <div class="card">
+      <div class="row">
+        <input type="text" id="userId" placeholder="참가자 ID (예: P01)" autocomplete="off">
+      </div>
+      <div class="row">
+        <label class="filebtn">tasks.json 불러오기<input type="file" id="file" accept=".json" hidden></label>
+        <span id="loadStatus" class="muted"></span>
+      </div>
+      <div class="row">
+        <button id="btnStart" class="primary" disabled>세션 시작</button>
+        <span id="introPyStatus" class="muted"></span>
+      </div>
+      <p class="muted" style="margin-bottom:0">
+        · 각 문제는 「문제 보기」를 누른 시점부터 시간이 기록됩니다.<br>
+        · 문제를 파악하고 풀이(작업)를 시작할 때 「풀이 시작」을 눌러주세요 (이해 시간과 풀이 시간이 분리 기록됩니다).<br>
+        · 풀이를 마치면 「완료」, 도저히 진행이 어려우면 「포기」를 누르세요.<br>
+        · 결과는 브라우저를 닫으면 사라지므로, 마지막 화면에서 반드시 결과 파일을 다운로드하세요.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 2. 문제 대기 화면 ============ -->
+  <section id="scr-ready" class="hidden">
+    <div class="progress" id="readyProgress"></div>
+    <div class="card" style="text-align:center; padding: 60px 24px;">
+      <p style="font-size:15px; margin:0 0 20px;">준비되면 아래 버튼을 눌러 문제를 확인하세요.<br>
+      <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다.</span></p>
+      <button id="btnShow" class="primary" style="font-size:16px; padding:14px 34px;">문제 보기</button>
+      <div id="pyLoadStatus" class="muted" style="margin-top:14px;"></div>
+    </div>
+  </section>
+
+  <!-- ============ 3. 문제 화면 ============ -->
+  <section id="scr-task" class="hidden">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <span class="badge" id="taskBadge"></span>
+        <span class="progress" id="taskProgress"></span>
+      </div>
+      <div class="phase" id="phaseLabel">단계: 문제 파악</div>
+    </div>
+    <h1 id="taskTitle" style="font-size:17px; margin-top:10px;"></h1>
+    <pre class="body" id="taskBody"></pre>
+    <div id="editorWrap" class="hidden">
+      <div id="workspace">
+        <div>
+          <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 실행)</span></div>
+          <textarea id="codeEditor" spellcheck="false" placeholder="# 여기에 코드를 작성하세요"></textarea>
+          <div id="stdinWrap" class="hidden">
+            <div class="lbl">표준 입력 (stdin) — input()이 이 내용을 읽습니다</div>
+            <textarea id="stdinBox" spellcheck="false" placeholder="예제 입력을 붙여넣으세요"></textarea>
+          </div>
+          <div id="runRow">
+            <button id="btnRun">▶ 실행</button>
+            <span id="runStatus"></span>
+          </div>
+        </div>
+        <div>
+          <div class="pane-label"><span>출력 (terminal)</span><button id="btnClearTerm">지우기</button></div>
+          <pre id="terminal"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <button id="btnSolve" class="primary">풀이 시작</button>
+      <button id="btnDone" class="primary hidden">완료</button>
+      <button id="btnGiveup" class="ghost">포기</button>
+    </div>
+  </section>
+
+  <!-- ============ 4. 평정 화면 ============ -->
+  <section id="scr-rate" class="hidden">
+    <div class="card">
+      <p style="margin:0 0 4px; font-weight:600;">이 문제의 체감 난이도는 어땠나요?</p>
+      <p class="muted" style="margin:0;">1 = 매우 쉬움 · 5 = 매우 어려움</p>
+      <div class="rating" id="ratingBtns"></div>
+      <div class="row"><button id="btnRateNext" class="primary" disabled>다음 문제로</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 5. 종료 화면 ============ -->
+  <section id="scr-end" class="hidden">
+    <h1>세션 완료</h1>
+    <p class="muted">아래 버튼으로 결과를 반드시 저장하세요. 이 페이지를 닫으면 데이터가 사라집니다.</p>
+    <div class="row">
+      <button id="btnCsv" class="primary">결과 CSV 다운로드</button>
+      <button id="btnJson">결과 JSON 다운로드</button>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+      <table id="summary"></table>
+    </div>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
+let tasks = [], order = [], results = [], cur = -1;
+let userId = '';
+let t_shown = 0, t_solve = 0, hiddenMs = 0, hiddenSince = 0, t_firstKey = 0;
+let runCount = 0, lastRunOk = null;
+let pendingRating = 0;
+
+const $ = s => document.querySelector(s);
+const show = id => {
+  ['scr-intro','scr-ready','scr-task','scr-rate','scr-end']
+    .forEach(s => $('#'+s).classList.toggle('hidden', s !== id));
+  window.scrollTo(0,0);
+};
+
+/* ---------- 시드 셔플 (참가자 ID 기반, 재현 가능) ---------- */
+function xmur3(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){
+  h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19;}
+  return ()=>{h=Math.imul(h^(h>>>16),2246822507); h=Math.imul(h^(h>>>13),3266489909);
+  return (h^=h>>>16)>>>0;}; }
+function mulberry32(a){ return ()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296;}; }
+function seededShuffle(arr, rnd){
+  const a = arr.slice();
+  for (let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+function buildOrder(tasks, uid){
+  const seed = xmur3(uid)();
+  const rnd = mulberry32(seed);
+  const sources = ['APPS','DS-1000','BugsInPy'];
+  const rot = seed % 3;                      // 블록 순서 회전 (라틴 방진식)
+  const blockOrder = sources.slice(rot).concat(sources.slice(0,rot));
+  let idxs = [];
+  for (const s of blockOrder){
+    const block = tasks.map((t,i)=>({t,i})).filter(x=>x.t.source===s).map(x=>x.i);
+    idxs = idxs.concat(seededShuffle(block, rnd));  // 블록 내 셔플
+  }
+  return idxs;
+}
+
+/* ---------- 참가자용 본문 (BugsInPy는 정답 제거) ---------- */
+function participantBody(t){
+  let text = t.body_ko || t.body || '';
+  if (t.source === 'BugsInPy'){
+    // 구버전 tasks.json 호환: 정답 섹션이 남아있으면 제거
+    for (const cut of ['[수정 내용]','[패치 원문]']){
+      const i = text.indexOf(cut);
+      if (i !== -1) text = text.slice(0, i).trimEnd();
+    }
+    if (t.starter_code)
+      text += '\n\n──────── 코드 (풀이 시작을 누르면 에디터에 복사됩니다) ────────\n\n' + t.starter_code;
+  }
+  return text;
+}
+
+/* ---------- 화면 흐름 ---------- */
+$('#file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    tasks = JSON.parse(await f.text());
+    if (!Array.isArray(tasks) || !tasks.length) throw new Error('빈 배열');
+    $('#loadStatus').textContent = `${tasks.length}개 문제 로드됨`;
+  } catch (err){ alert('tasks.json 파싱 실패: '+err.message); tasks=[]; }
+  updateStartBtn();
+});
+$('#userId').addEventListener('input', updateStartBtn);
+function updateStartBtn(){
+  $('#btnStart').disabled = !(tasks.length && $('#userId').value.trim());
+}
+
+$('#btnStart').onclick = () => {
+  userId = $('#userId').value.trim();
+  order = buildOrder(tasks, userId);
+  results = []; cur = -1;
+  if (!pyWorker) spawnWorker();   // (페이지 로드시 이미 시작됨 — 안전장치)
+  nextTask();
+};
+
+function nextTask(){
+  cur++;
+  if (cur >= order.length){ finish(); return; }
+  $('#readyProgress').textContent = `참가자 ${userId} · 문제 ${cur+1} / ${order.length}`;
+  $('#btnShow').disabled = !(pyCoreReady || pyFailed);
+  if (!pyCoreReady && !pyFailed) $('#pyLoadStatus').textContent = 'Python 코어 준비 중… (수 초) 완료되면 버튼이 활성화됩니다.';
+  show('scr-ready');
+}
+
+$('#btnShow').onclick = () => {
+  const t = tasks[order[cur]];
+  $('#taskBadge').className = 'badge b-'+t.source;
+  $('#taskBadge').textContent = t.source;
+  $('#taskProgress').textContent = ` ${cur+1} / ${order.length}`;
+  $('#taskTitle').textContent = t.title_ko || t.title || t.id;
+  const body = $('#taskBody');
+  body.textContent = participantBody(t);
+  body.classList.toggle('mono', t.source !== 'APPS');
+  $('#btnSolve').classList.remove('hidden');
+  $('#btnDone').classList.add('hidden');
+  $('#editorWrap').classList.add('hidden');
+  $('#codeEditor').value = t.starter_code || '';
+  $('#stdinBox').value = '';
+  $('#runRow').classList.toggle('hidden', t.source === 'BugsInPy');  // 스니펫은 의존성 때문에 실행 불가
+  $('#terminal').innerHTML = '';
+  $('#runStatus').textContent = '';
+  runCount = 0; lastRunOk = null;
+  $('#stdinWrap').classList.toggle('hidden', t.source !== 'APPS');
+  $('#phaseLabel').textContent = '단계: 문제 파악';
+  t_shown = Date.now(); t_solve = 0; hiddenMs = 0; hiddenSince = 0; t_firstKey = 0;
+  show('scr-task');
+};
+
+$('#btnSolve').onclick = () => {
+  t_solve = Date.now();
+  $('#btnSolve').classList.add('hidden');
+  $('#btnDone').classList.remove('hidden');
+  $('#editorWrap').classList.remove('hidden');
+  $('#phaseLabel').textContent = '단계: 풀이 중';
+  $('#codeEditor').focus();
+};
+
+/* 에디터: 탭 키 = 공백 4칸, 첫 입력 시각 기록 */
+$('#codeEditor').addEventListener('keydown', e => {
+  if (!t_firstKey) t_firstKey = Date.now();
+  if (e.key === 'Tab'){
+    e.preventDefault();
+    const ta = e.target, s = ta.selectionStart, epos = ta.selectionEnd;
+    ta.value = ta.value.slice(0, s) + '    ' + ta.value.slice(epos);
+    ta.selectionStart = ta.selectionEnd = s + 4;
+  }
+});
+
+$('#btnDone').onclick   = () => endTask('done');
+$('#btnGiveup').onclick = () => {
+  if (confirm('이 문제를 포기하시겠습니까?')) endTask('giveup');
+};
+
+function endTask(status){
+  const now = Date.now();
+  const t = tasks[order[cur]];
+  results.push({
+    user_id: userId,
+    order_index: cur + 1,
+    task_id: t.id, source: t.source, group: t.group, difficulty: t.difficulty,
+    shown_at: new Date(t_shown).toISOString(),
+    solve_started_at: t_solve ? new Date(t_solve).toISOString() : '',
+    ended_at: new Date(now).toISOString(),
+    comprehension_sec: t_solve ? +((t_solve - t_shown)/1000).toFixed(1) : '',
+    solving_sec: t_solve ? +((now - t_solve)/1000).toFixed(1) : '',
+    total_sec: +((now - t_shown)/1000).toFixed(1),
+    tab_hidden_sec: +((hiddenMs + (hiddenSince ? now - hiddenSince : 0))/1000).toFixed(1),
+    time_to_first_keystroke_sec: t_firstKey ? +((t_firstKey - t_solve)/1000).toFixed(1) : '',
+    status: status,
+    rating: null,
+    run_count: runCount,
+    last_run_ok: lastRunOk,
+    code_chars: $('#codeEditor').value.length,
+    code: $('#codeEditor').value,
+  });
+  // 평정 화면
+  pendingRating = 0;
+  const rb = $('#ratingBtns'); rb.innerHTML = '';
+  for (let v=1; v<=5; v++){
+    const b = document.createElement('button');
+    b.textContent = v;
+    b.onclick = () => { pendingRating = v;
+      [...rb.children].forEach(c=>c.classList.toggle('sel', c===b));
+      $('#btnRateNext').disabled = false; };
+    rb.appendChild(b);
+  }
+  $('#btnRateNext').disabled = true;
+  show('scr-rate');
+}
+
+$('#btnRateNext').onclick = () => {
+  results[results.length-1].rating = pendingRating;
+  nextTask();
+};
+
+/* ---------- 탭 이탈 시간 측정 ---------- */
+document.addEventListener('visibilitychange', () => {
+  if ($('#scr-task').classList.contains('hidden')) return;
+  if (document.hidden) hiddenSince = Date.now();
+  else if (hiddenSince){ hiddenMs += Date.now() - hiddenSince; hiddenSince = 0; }
+});
+
+/* ---------- 종료 / 내보내기 ---------- */
+function finish(){
+  const tb = $('#summary');
+  const cols = ['order_index','task_id','source','status','comprehension_sec','solving_sec','total_sec','tab_hidden_sec','rating','code_chars'];
+  const head = ['순서','문제 ID','소스','상태','이해(초)','풀이(초)','총(초)','이탈(초)','난이도','코드(자)'];
+  tb.innerHTML = '<tr>'+head.map(h=>`<th>${h}</th>`).join('')+'</tr>' +
+    results.map(r=>'<tr>'+cols.map(c=>{
+      let v = r[c] ?? '';
+      if (c==='status') return `<td class="${v==='done'?'ok':'bad'}">${v==='done'?'완료':'포기'}</td>`;
+      return `<td>${v}</td>`;
+    }).join('')+'</tr>').join('');
+  show('scr-end');
+  downloadJson(); // 로컬 백업 저장
+  submitResults();
+}
+
+async function submitResults(){
+  if (execMode !== 'server') return;
+  try {
+    const r = await fetch('submit', {
+      method:'POST',
+      headers: {'Content-Type':'application/json', ...authHeaders()},
+      body: JSON.stringify({user_id: userId, results})
+    });
+    const j = await r.json();
+    const el = document.createElement('p');
+    el.className = 'muted';
+    el.textContent = j.ok ? `✓ 서버에 저장됨 (${j.saved})` : `⚠ 서버 저장 실패: ${j.out || ''} — 다운로드 파일을 보관하세요`;
+    $('#scr-end .muted').after(el);
+  } catch (e){ /* 로컬 다운로드가 백업 */ }
+}
+
+function dl(name, content, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+function downloadJson(){
+  dl(`pilot_${userId}_${Date.now()}.json`, JSON.stringify(results, null, 2), 'application/json');
+}
+$('#btnJson').onclick = downloadJson;
+$('#btnCsv').onclick = () => {
+  const cols = Object.keys(results[0] || {user_id:1});
+  const escv = v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const csv = '\ufeff' + cols.join(',') + '\n' +
+    results.map(r => cols.map(c => escv(r[c])).join(',')).join('\n');
+  dl(`pilot_${userId}_${Date.now()}.csv`, csv, 'text/csv');
+};
+
+/* ---------- Pyodide 실행기 (Web Worker + 타임아웃) ---------- */
+const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+let PYODIDE_URL = PYODIDE_CDN;  // resolvePyodideUrl()이 로컬 파일을 찾으면 교체
+const RUN_TIMEOUT_MS = 20000;
+let pyWorker = null, pyCoreReady = false, pyReady = false, runBusy = false, pyFailed = false;
+let pySource = '';
+
+function onPyProgress(msg){
+  for (const id of ['#pyLoadStatus','#introPyStatus']){
+    const el = $(id); if (el) el.textContent = msg;
+  }
+}
+function onPyReadyChanged(){
+  const btn = $('#btnShow'), el = $('#pyLoadStatus');
+  if (pyCoreReady){
+    btn.disabled = false;   // 코어만 준비되면 세션 진행 가능; 패키지는 백그라운드
+    if (pyReady && el) el.textContent = '';
+  } else if (pyFailed){
+    btn.disabled = false;  // 실행 없이라도 세션은 진행 가능해야 함
+    if (el) el.textContent = '⚠ Python 로딩 실패 — 실행 기능 없이 진행합니다 (네트워크 확인)';
+  }
+}
+
+const workerSrc = () => `
+importScripts('${PYODIDE_URL}');
+let pyodide = null, pkgPromise = null;
+async function init(){
+  try {
+    const t0 = Date.now();
+    postMessage({type:'progress', msg:'Python 코어 로딩 중…'});
+    pyodide = await loadPyodide({indexURL: '${PYODIDE_URL}'.replace(/pyodide\.js$/, '')});
+    postMessage({type:'coreready', ms: Date.now() - t0});
+    // numpy/pandas는 백그라운드: 휠 로드 + 최초 import까지 미리 수행 (첫 실행 지연 제거)
+    pkgPromise = (async () => {
+      await pyodide.loadPackage(['numpy','pandas'], {messageCallback: ()=>{}});
+      await pyodide.runPythonAsync('import numpy, pandas');
+    })();
+    await pkgPromise;
+    postMessage({type:'ready', ms: Date.now() - t0});
+  } catch (err){
+    postMessage({type:'initerror', msg:String(err)});
+  }
+}
+init();
+onmessage = async (e) => {
+  const {code, stdin} = e.data;
+  if (!pyodide){ postMessage({type:'result', ok:false, out:'(Python 초기화 전입니다)'}); return; }
+  if (pkgPromise){ try { await pkgPromise; } catch(e){} }
+  let out = '';
+  pyodide.setStdout({batched: s => { out += s + '\n'; }});
+  pyodide.setStderr({batched: s => { out += s + '\n'; }});
+  try {
+    await pyodide.loadPackagesFromImports(code, {messageCallback: ()=>{}});
+    pyodide.globals.set('__stdin_text', stdin || '');
+    await pyodide.runPythonAsync(
+      'import sys, io\nsys.stdin = io.StringIO(__stdin_text)\n'
+    );
+    await pyodide.runPythonAsync(code);
+    postMessage({type:'result', ok:true, out});
+  } catch (err){
+    postMessage({type:'result', ok:false, out: out + String(err)});
+  }
+};
+`;
+
+let fallbackMode = false, pyodideMain = null;
+
+async function resolvePyodideUrl(){
+  // 로컬 서버로 서빙 중이면 ./pyodide/pyodide.js 를 우선 사용 (setup_local_pyodide.py 참조)
+  if (location.protocol.startsWith('http')){
+    try {
+      const local = new URL('pyodide/pyodide.js', location.href).href;
+      const r = await fetch(local, {method:'HEAD'});
+      if (r.ok){ PYODIDE_URL = local; pySource = '로컬'; return; }
+    } catch (e) { /* fall through to CDN */ }
+  }
+  PYODIDE_URL = PYODIDE_CDN; pySource = 'CDN';
+}
+
+// 실행 백엔드 결정: 로컬 서버(/run) 우선, 없으면 Pyodide fallback
+let execMode = 'none';
+(async () => {
+  if (location.protocol.startsWith('http')){
+    try {
+      const r = await fetch('ping', {cache:'no-store'});
+      const j = await r.json();
+      if (j.service === 'pilot-runner'){
+        if (j.token_required && !TOKEN){
+          onPyProgress('⚠ 이 서버는 토큰이 필요합니다 — 접속 URL 끝에 ?token=... 을 붙여주세요');
+        }
+        execMode = 'server';
+        pyCoreReady = true; pyReady = true; pySource = '로컬 Python ' + (j.python || '');
+        onPyProgress(`Python 준비 완료 [${pySource}]`);
+        onPyReadyChanged();
+        return;
+      }
+    } catch (e) { /* run_viewer.py가 아닌 서버 — fallback */ }
+  }
+  execMode = 'pyodide';
+  await resolvePyodideUrl();
+  spawnWorker();
+})();
+
+function spawnWorker(){
+  pyReady = false; pyCoreReady = false;
+  try {
+    const blob = new Blob([workerSrc()], {type:'application/javascript'});
+    pyWorker = new Worker(URL.createObjectURL(blob));
+    pyWorker.onerror = () => { if (!pyReady) enterFallback(); };
+    pyWorker.onerror = err => {
+    pyFailed = true;
+    onPyProgress('⚠ Python 로딩 실패: ' + (err.message || 'importScripts 오류') + ' — 실행 기능 없이 진행 가능합니다');
+    onPyReadyChanged();
+  };
+  pyWorker.onmessage = e => {
+      if (e.data.type === 'ready'){ pyReady = true; if (!runBusy) $('#runStatus').textContent = 'Python 준비됨'; }
+      else if (e.data.type === 'result') onRunResult(e.data);
+    };
+  } catch (err) {
+    enterFallback();
+  }
+}
+
+function enterFallback(){
+  fallbackMode = true;
+  pyWorker = null;
+  $('#runStatus').textContent = '⚠ 제한 모드: 이 환경에서는 실행 격리가 불가합니다. 무한 루프 시 페이지가 멈출 수 있으니, 가급적 파일을 로컬에 저장해 열어주세요.';
+}
+
+async function ensurePyodideMain(){
+  if (pyodideMain) return pyodideMain;
+  if (!window.loadPyodide){
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = PYODIDE_URL; s.onload = res; s.onerror = () => rej(new Error('Pyodide 로드 실패'));
+      document.head.appendChild(s);
+    });
+  }
+  pyodideMain = await loadPyodide();
+  return pyodideMain;
+}
+
+async function runOnMainThread(code, stdin){
+  try {
+    const py = await ensurePyodideMain();
+    let out = '';
+    py.setStdout({batched: s => { out += s + '\n'; }});
+    py.setStderr({batched: s => { out += s + '\n'; }});
+    try {
+      await py.loadPackagesFromImports(code, {messageCallback: ()=>{}});
+      py.globals.set('__stdin_text', stdin || '');
+      await py.runPythonAsync('import sys, io\nsys.stdin = io.StringIO(__stdin_text)\n');
+      await py.runPythonAsync(code);
+      onRunResult({ok:true, out});
+    } catch (err){
+      onRunResult({ok:false, out: out + String(err)});
+    }
+  } catch (err){
+    onRunResult({ok:false, out: '실행 환경 초기화 실패: ' + err.message});
+  }
+}
+
+let runTimer = null, resultHandler = null;
+function onRunResult(data){
+  if (runTimer){ clearTimeout(runTimer); runTimer = null; }
+  runBusy = false;
+  $('#btnRun').disabled = false;
+  $('#runStatus').textContent = '';
+  termAppend((data.out || '(출력 없음)').replace(/\n?$/, '\n'), data.ok ? 't-ok' : 't-err');
+  termAppend('\n');
+  lastRunOk = data.ok;
+}
+
+$('#btnRun').onclick = () => {
+  if (runBusy) return;
+  const code = $('#codeEditor').value;
+  if (!code.trim()) return;
+  if (!pyWorker && !fallbackMode) spawnWorker();
+  runCount++;
+  if (!t_firstKey) t_firstKey = Date.now();
+  runBusy = true;
+  $('#btnRun').disabled = true;
+  if (pyFailed){ runBusy=false; $('#btnRun').disabled=false;
+    onRunResult({ok:false, out:'(Python 환경을 사용할 수 없습니다 — 네트워크를 확인하세요)'}); return; }
+  $('#runStatus').textContent = pyReady ? '실행 중…' :
+    (pyCoreReady ? '수치 패키지 로딩을 기다리는 중…' : 'Python 재로딩 중… 잠시만 기다려주세요');
+  const send = () => {
+    $('#runStatus').textContent = '실행 중…';
+    pyWorker.postMessage({code, stdin: $('#stdinBox').value});
+    runTimer = setTimeout(() => {
+      // 무한 루프 등: 워커 강제 종료 후 재기동
+      pyWorker.terminate(); pyWorker = null;
+      onRunResult({ok:false, out:`(시간 초과: ${RUN_TIMEOUT_MS/1000}초 — 무한 루프 여부를 확인하세요. 다음 실행 시 Python이 다시 로딩됩니다)`});
+      spawnWorker();
+    }, RUN_TIMEOUT_MS);
+  };
+  if (fallbackMode){
+    $('#runStatus').textContent = '실행 중… (제한 모드)';
+    runOnMainThread(code, $('#stdinBox').value);
+    return;
+  }
+  if (pyReady) send();
+  else {
+    let waited = 0;
+    const wait = setInterval(() => {
+      if (fallbackMode){ clearInterval(wait); $('#btnRun').disabled = false; runBusy = false; return; }
+      if (pyReady){ clearInterval(wait); send(); }
+      else if ((waited += 200) > 90000){ clearInterval(wait);
+        onRunResult({ok:false, out:'Python 로딩이 90초를 초과했습니다. 네트워크를 확인하세요.'}); }
+    }, 200);
+  }
+};
+
+/* ---------- 이탈 방지 ---------- */
+window.addEventListener('beforeunload', e => {
+  if (results.length && $('#scr-end').classList.contains('hidden')){
+    e.preventDefault(); e.returnValue = '';
+  }
+});
+</script>
+</body>
+</html>
