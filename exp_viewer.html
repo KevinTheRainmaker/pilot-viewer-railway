@@ -113,6 +113,16 @@
   #terminal .t-ok { color:#d8f2d8; }
   #terminal .t-err { color:#f2b8b8; }
   #terminal .t-sys { color:#777; font-style:italic; }
+
+  /* ---- 컨디션별 GPT 트라이얼 ---- */
+  #scr-trial .trial-wrap { max-width: 760px; margin: 0 auto; }
+  #trialCondition { font-size: 13px; color: var(--accent); font-weight: 700; margin-bottom: 8px; }
+  #trialStepTitle { font-size: 18px; margin: 0 0 10px; }
+  #trialInstruction { font-size: 14px; line-height: 1.75; margin: 0 0 14px; }
+  #trialPrompt { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.7; }
+  #trialProgress { margin-top: 12px; }
+
 </style>
 </head>
 <body>
@@ -148,6 +158,24 @@
         · 풀이를 마치면 「완료」, 도저히 진행이 어려우면 「포기」를 누르세요.<br>
         · 결과는 브라우저를 닫으면 사라지므로, 마지막 화면에서 반드시 결과 파일을 다운로드하세요.
       </p>
+    </div>
+  </section>
+
+  <!-- ============ 2. 컨디션별 트라이얼 화면 ============ -->
+  <section id="scr-trial" class="hidden">
+    <div class="trial-wrap">
+      <div class="progress" id="trialSetLabel"></div>
+      <div class="card" style="padding:32px;">
+        <div id="trialCondition"></div>
+        <h1 id="trialStepTitle">트라이얼</h1>
+        <p id="trialInstruction"></p>
+        <pre id="trialPrompt"></pre>
+        <div class="row">
+          <button id="btnCopyTrial">프롬프트 복사</button>
+          <button id="btnTrialNext" class="primary">입력 및 전송 확인</button>
+        </div>
+        <p id="trialProgress" class="muted"></p>
+      </div>
     </div>
   </section>
 
@@ -251,10 +279,12 @@ let userId = '', userGroup = '', sessionTs = 0;
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
+let trialSteps = [], trialStepIndex = 0;
+let completedTrialSets = new Set();
 
 const $ = s => document.querySelector(s);
 const show = id => {
-  ['scr-intro','scr-ready','scr-task','scr-rate','scr-end']
+  ['scr-intro','scr-trial','scr-ready','scr-task','scr-rate','scr-end']
     .forEach(s => $('#'+s).classList.toggle('hidden', s !== id));
   window.scrollTo(0,0);
 };
@@ -336,6 +366,84 @@ function renderProblemBody(el, text, useMarkdown = true){
   }
 }
 
+
+function conditionAtSetPosition(setPos){
+  return LATIN[userGroup].cond.split(/\s+/)[setPos];
+}
+
+function buildTrialSteps(condition, isFirstOverallTrial){
+  const steps = [];
+  if (isFirstOverallTrial){
+    steps.push({
+      title: '기본 전송 확인',
+      instruction: '아래 문장을 GPT 창에 그대로 입력하고 전송하세요. 별도의 개입 없이 프롬프트가 전송되는지 확인합니다.',
+      prompt: '좋은 회고문을 쓰려면 어떤 요소가 들어가야 해?'
+    });
+  }
+  steps.push({
+    title: '트라이얼 질문',
+    instruction: '아래 내용을 GPT 창에 그대로 입력하고 전송한 뒤, 현재 컨디션의 동작을 확인하세요.',
+    prompt: '회고문 작성해줘\n\n이번 주에 새 프로젝트를 시작했고, 회의가 많아서 집중 시간이 부족했어.'
+  });
+  if (condition === 'Ded-Us' || condition === 'Ded-Sys'){
+    steps.push({
+      title: '추가 프롬프트',
+      instruction: '앞선 대화에 이어 아래 문장을 GPT 창에 입력하고 전송하여 Ded 조건의 동작을 확인하세요.',
+      prompt: '내가 보기엔 회의가 많아서 집중 시간이 줄어든 게 가장 큰 문제였던 것 같아. 다음 주에는 오전 시간을 비워두는 방향으로 개선하고 싶어.'
+    });
+  }
+  return steps;
+}
+
+function startTrialForCurrentSet(){
+  const setPos = Math.floor(cur / 3);
+  const condition = conditionAtSetPosition(setPos);
+  trialSteps = buildTrialSteps(condition, setPos === 0);
+  trialStepIndex = 0;
+  $('#trialSetLabel').textContent = `참가자 ${userId} (${userGroup}) · 세트 ${setPos + 1}/4 시작 전`;
+  $('#trialCondition').textContent = `현재 컨디션: ${condition}`;
+  renderTrialStep();
+  show('scr-trial');
+}
+
+function renderTrialStep(){
+  const step = trialSteps[trialStepIndex];
+  $('#trialStepTitle').textContent = step.title;
+  $('#trialInstruction').textContent = step.instruction;
+  $('#trialPrompt').textContent = step.prompt;
+  $('#trialProgress').textContent = `트라이얼 ${trialStepIndex + 1}/${trialSteps.length}`;
+  $('#btnTrialNext').textContent = trialStepIndex === trialSteps.length - 1
+    ? '트라이얼 완료 후 문제로 이동'
+    : '입력 및 전송 확인';
+}
+
+$('#btnCopyTrial').onclick = async () => {
+  const text = trialSteps[trialStepIndex]?.prompt || '';
+  try {
+    await navigator.clipboard.writeText(text);
+    $('#btnCopyTrial').textContent = '복사됨';
+    setTimeout(() => { $('#btnCopyTrial').textContent = '프롬프트 복사'; }, 1000);
+  } catch (e) {
+    alert('자동 복사에 실패했습니다. 화면의 문장을 직접 복사해주세요.');
+  }
+};
+
+$('#btnTrialNext').onclick = () => {
+  if (trialStepIndex < trialSteps.length - 1){
+    trialStepIndex++;
+    renderTrialStep();
+    return;
+  }
+  completedTrialSets.add(Math.floor(cur / 3));
+  showReadyForCurrentTask();
+};
+
+function showReadyForCurrentTask(){
+  $('#readyProgress').textContent = `참가자 ${userId} (${userGroup}) · ${setLabel(cur)}`;
+  $('#btnShow').disabled = false;
+  show('scr-ready');
+}
+
 /* ---------- 화면 흐름 ---------- */
 $('#file').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -381,9 +489,13 @@ $('#btnStart').onclick = () => {
 function nextTask(){
   cur++;
   if (cur >= order.length){ finish(); return; }
-  $('#readyProgress').textContent = `참가자 ${userId} (${userGroup}) · ${setLabel(cur)}`;
-  $('#btnShow').disabled = false;
-  show('scr-ready');
+  const setPos = Math.floor(cur / 3);
+  const isFirstTaskOfSet = cur % 3 === 0;
+  if (isFirstTaskOfSet && !completedTrialSets.has(setPos)){
+    startTrialForCurrentSet();
+    return;
+  }
+  showReadyForCurrentTask();
 }
 
 $('#btnShow').onclick = () => {
