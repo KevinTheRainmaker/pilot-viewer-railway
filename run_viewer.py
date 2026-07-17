@@ -34,6 +34,7 @@ import webbrowser
 from functools import partial
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 RUN_TIMEOUT_DEFAULT = 20  # 초
 RUN_TOKEN = os.environ.get("RUN_TOKEN", "")          # 배포 시 필수
@@ -76,6 +77,14 @@ class QuietHandler(SimpleHTTPRequestHandler):
         return self.client_address[0] in ("127.0.0.1", "::1")
 
     def do_GET(self):
+        request = urlsplit(self.path)
+        if (request.path == "/pilot_viewer.html"
+                and parse_qs(request.query).get("viewer") == ["exp"]):
+            location = "/exp_viewer.html" + (f"?{request.query}" if request.query else "")
+            self.send_response(302)
+            self.send_header("Location", location)
+            self.end_headers()
+            return
         if self.path == "/ping":
             self._json(200, {"service": "pilot-runner",
                              "python": sys.version.split()[0],
