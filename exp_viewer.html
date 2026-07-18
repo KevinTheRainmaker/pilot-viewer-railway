@@ -228,14 +228,26 @@
   <!-- ============ 4. 평정 화면 ============ -->
   <section id="scr-rate" class="hidden">
     <div class="card">
-      <p style="margin:0 0 4px; font-weight:600;">이 문제의 체감 난이도는 어땠나요?</p>
-      <p class="muted" style="margin:0;">1 = 매우 쉬움 · 5 = 매우 어려움</p>
+      <p style="margin:0 0 4px; font-weight:600;">이번 문제를 해결하는 과정은 나에게 얼마나 어려웠나요?</p>
+      <p class="muted" style="margin:0;">1: 매우 쉬움 - 7: 매우 어려움</p>
       <div class="rating" id="ratingBtns"></div>
+      <div id="systemGuidanceQuestions"></div>
       <div class="row"><button id="btnRateNext" class="primary" disabled>다음 문제로</button></div>
     </div>
   </section>
 
-  <!-- ============ 5. 종료 화면 ============ -->
+  <!-- ============ 5. 조건 종료 안내 화면 ============ -->
+  <section id="scr-condition-complete" class="hidden">
+    <div class="card" style="text-align:center; padding:60px 24px;">
+      <h1>조건 완료</h1>
+      <p id="conditionFormInstruction" style="font-size:16px; line-height:1.7;"></p>
+      <div class="row" style="justify-content:center;">
+        <button id="btnConditionComplete" class="primary">설문 완료 후 다음으로</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. 종료 화면 ============ -->
   <section id="scr-end" class="hidden">
     <h1>세션 완료</h1>
     <p class="muted">아래 버튼으로 결과를 반드시 저장하세요. 이 페이지를 닫으면 데이터가 사라집니다.</p>
@@ -272,15 +284,25 @@ let userId = '', participantPlan = null, sessionTs = 0;
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
+let pendingSystemGuidanceResponses = {};
 let trialSteps = [], trialStepIndex = 0;
 let completedTrialSets = new Set();
 
 const $ = s => document.querySelector(s);
 const show = id => {
-  ['scr-intro','scr-trial','scr-ready','scr-task','scr-rate','scr-end']
+  ['scr-intro','scr-trial','scr-ready','scr-task','scr-rate','scr-condition-complete','scr-end']
     .forEach(s => $('#'+s).classList.toggle('hidden', s !== id));
   window.scrollTo(0,0);
 };
+
+const SYSTEM_GUIDANCE_QUESTIONS = [
+  {field: 'system_content_reading', text: '시스템이 제시한 내용을 주의 깊게 읽었다.'},
+  {field: 'system_guidance_reflection', text: '시스템이 제시한 안내는 내가 하려던 행동을 한 번 더 돌아보게 만들었다.'},
+  {field: 'predecided_action', text: '시스템이 제시한 내용을 읽기 전에, 이미 어떻게 행동할지 결정한 경우가 많았다.'},
+  {field: 'system_guidance_influence', text: '시스템이 제시한 안내는 나의 다음 행동에 영향을 주었다.'},
+  {field: 'system_guidance_immediate_action', text: '시스템이 제시한 안내는 내가 깊이 생각하기보다 바로 행동하도록 만들었다.'},
+];
+const CONDITION_ORDINALS = ['1번째 조건', '2번째 조건', '3번째 조건', '4번째 조건'];
 
 /* ---------- 시드 셔플 (참가자 ID 기반, 재현 가능) ---------- */
 /* ---- 고정 태스크 셋 (세트 내 순서: APPS > DS-1000 > BugsInPy 고정) ---- */
@@ -634,24 +656,84 @@ function endTask(status){
   });
   // 평정 화면
   pendingRating = 0;
+  pendingSystemGuidanceResponses = Object.fromEntries(
+    SYSTEM_GUIDANCE_QUESTIONS.map(({field}) => [field, 0])
+  );
   const rb = $('#ratingBtns'); rb.innerHTML = '';
-  for (let v=1; v<=5; v++){
+  for (let v=1; v<=7; v++){
     const b = document.createElement('button');
     b.textContent = v;
     b.onclick = () => { pendingRating = v;
       [...rb.children].forEach(c=>c.classList.toggle('sel', c===b));
-      $('#btnRateNext').disabled = false; };
+      updateRateNextButton(); };
     rb.appendChild(b);
   }
-  $('#btnRateNext').disabled = true;
+  renderSystemGuidanceQuestions();
+  updateRateNextButton();
   show('scr-rate');
 }
 
+function renderSystemGuidanceQuestions(){
+  const wrap = $('#systemGuidanceQuestions');
+  wrap.innerHTML = '';
+  for (const question of SYSTEM_GUIDANCE_QUESTIONS){
+    const label = document.createElement('p');
+    label.style.cssText = 'margin:24px 0 4px; font-weight:600;';
+    label.textContent = question.text;
+    const scale = document.createElement('p');
+    scale.className = 'muted';
+    scale.style.margin = '0';
+    scale.textContent = '1 = 매우 그렇지 않다 · 7 = 매우 그렇다';
+    const buttons = document.createElement('div');
+    buttons.className = 'rating';
+    for (let value=1; value<=7; value++){
+      const button = document.createElement('button');
+      button.textContent = value;
+      button.onclick = () => {
+        pendingSystemGuidanceResponses[question.field] = value;
+        [...buttons.children].forEach(child => child.classList.toggle('sel', child === button));
+        updateRateNextButton();
+      };
+      buttons.appendChild(button);
+    }
+    wrap.append(label, scale, buttons);
+  }
+}
+
+function updateRateNextButton(){
+  const complete = pendingRating > 0 && SYSTEM_GUIDANCE_QUESTIONS.every(
+    ({field}) => pendingSystemGuidanceResponses[field] > 0
+  );
+  $('#btnRateNext').disabled = !complete;
+}
+
 $('#btnRateNext').onclick = () => {
-  results[results.length-1].rating = pendingRating;
+  Object.assign(results[results.length-1], {
+    rating: pendingRating,
+    ...pendingSystemGuidanceResponses,
+  });
   submitResults(false);   // 문제마다 서버에 증분 저장 (같은 세션 파일 덮어쓰기)
+  if (results[results.length-1].pos_in_set === 3){
+    showConditionComplete();
+    return;
+  }
   nextTask();
 };
+
+function showConditionComplete(){
+  const setPosition = results[results.length-1].set_position;
+  const ordinal = CONDITION_ORDINALS[setPosition - 1];
+  const message = `제공 받은 구글폼에서 '${ordinal}' 설문을 진행해주세요.`;
+  $('#conditionFormInstruction').textContent = setPosition === 4
+    ? `${message} 이어서 '조건 비교' 설문까지 완료해주세요.`
+    : message;
+  $('#btnConditionComplete').textContent = setPosition === 4
+    ? '모든 설문 완료 후 결과 보기'
+    : '설문 완료 후 다음 조건으로';
+  show('scr-condition-complete');
+}
+
+$('#btnConditionComplete').onclick = () => nextTask();
 
 $('#btnEndSession') && ($('#btnEndSession').onclick = () => {
   if (!results.length){ alert('아직 완료한 문제가 없습니다.'); return; }
