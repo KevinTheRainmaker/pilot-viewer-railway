@@ -24,6 +24,13 @@ python run_viewer.py
 https://<도메인>/pilot_viewer.html?token=<RUN_TOKEN>
 ```
 
+실험 뷰어를 열려면 기존 URL에 `&viewer=exp`를 추가하세요. 토큰은 그대로
+전달되므로 코드 실행과 결과 저장은 동일한 Railway Python 서버를 사용합니다.
+
+```
+https://<도메인>/pilot_viewer.html?token=<RUN_TOKEN>&viewer=exp
+```
+
 ## 결과 수집
 
 세션 종료 시 `results/<참가자ID>_<timestamp>.json`으로 서버에 자동 저장되고,

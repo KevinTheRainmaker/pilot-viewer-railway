@@ -135,14 +135,7 @@
     문제 제시 순서는 참가자 ID에 따라 자동으로 결정됩니다 (같은 ID = 같은 순서).</p>
     <div class="card">
       <div class="row">
-        <input type="text" id="userId" placeholder="참가자 ID (예: P01)" autocomplete="off">
-        <select id="userGroup" style="font:inherit; padding:10px 12px; border:1px solid var(--border); border-radius:8px;">
-          <option value="">그룹 선택</option>
-          <option value="G1">G1 (S1→S2→S3→S4)</option>
-          <option value="G2">G2 (S2→S3→S4→S1)</option>
-          <option value="G3">G3 (S3→S4→S1→S2)</option>
-          <option value="G4">G4 (S4→S1→S2→S3)</option>
-        </select>
+        <input type="text" id="userId" placeholder="참가자 ID (예: G1V1)" autocomplete="off">
       </div>
       <div class="row">
         <label class="filebtn">exp_tasks.json 불러오기<input type="file" id="file" accept=".json" hidden></label>
@@ -150,7 +143,7 @@
       </div>
       <div class="row">
         <button id="btnStart" class="primary" disabled>세션 시작</button>
-        <span id="introPyStatus" class="muted"></span>
+        <span id="assignmentStatus" class="muted"></span>
       </div>
       <p class="muted" style="margin-bottom:0">
         · 각 문제는 「문제 보기」를 누른 시점부터 시간이 기록됩니다.<br>
@@ -275,7 +268,7 @@ window.MathJax = {
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
 let tasks = [], order = [], results = [], cur = -1;
-let userId = '', userGroup = '', sessionTs = 0;
+let userId = '', participantPlan = null, sessionTs = 0;
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
@@ -297,15 +290,28 @@ const FIXED_SETS = [
   ['S3-A', 'S3-D', 'S3-B'],
   ['S4-A', 'S4-D', 'S4-B'],
 ];
-/* ---- 라틴스퀘어 그룹 (행 회전) ---- */
-const LATIN = {
-  G1: { sets: [0,1,2,3], cond: 'Ded-Us Ded-Sys Dir-Us Dir-Sys' },
-  G2: { sets: [1,2,3,0], cond: 'Ded-Sys Dir-Us Dir-Sys Ded-Us' },
-  G3: { sets: [2,3,0,1], cond: 'Dir-Us Dir-Sys Ded-Us Ded-Sys' },
-  G4: { sets: [3,0,1,2], cond: 'Dir-Sys Ded-Us Ded-Sys Dir-Us' },
+/* ---- 참가자 ID별 컨디션·세트 배정표 (제시 순서) ---- */
+const PARTICIPANT_PLANS = {
+  G1V1: [{condition:'C1', set:0}, {condition:'C2', set:1}, {condition:'C4', set:2}, {condition:'C3', set:3}],
+  G1V2: [{condition:'C1', set:1}, {condition:'C2', set:2}, {condition:'C4', set:3}, {condition:'C3', set:0}],
+  G1V3: [{condition:'C1', set:2}, {condition:'C2', set:3}, {condition:'C4', set:0}, {condition:'C3', set:1}],
+  G1V4: [{condition:'C1', set:3}, {condition:'C2', set:0}, {condition:'C4', set:1}, {condition:'C3', set:2}],
+  G2V1: [{condition:'C2', set:0}, {condition:'C3', set:1}, {condition:'C1', set:2}, {condition:'C4', set:3}],
+  G2V2: [{condition:'C2', set:1}, {condition:'C3', set:2}, {condition:'C1', set:3}, {condition:'C4', set:0}],
+  G2V3: [{condition:'C2', set:2}, {condition:'C3', set:3}, {condition:'C1', set:0}, {condition:'C4', set:1}],
+  G2V4: [{condition:'C2', set:3}, {condition:'C3', set:0}, {condition:'C1', set:1}, {condition:'C4', set:2}],
+  G3V1: [{condition:'C3', set:0}, {condition:'C4', set:1}, {condition:'C2', set:2}, {condition:'C1', set:3}],
+  G3V2: [{condition:'C3', set:1}, {condition:'C4', set:2}, {condition:'C2', set:3}, {condition:'C1', set:0}],
+  G3V3: [{condition:'C3', set:2}, {condition:'C4', set:3}, {condition:'C2', set:0}, {condition:'C1', set:1}],
+  G3V4: [{condition:'C3', set:3}, {condition:'C4', set:0}, {condition:'C2', set:1}, {condition:'C1', set:2}],
+  G4V1: [{condition:'C4', set:0}, {condition:'C1', set:1}, {condition:'C3', set:2}, {condition:'C2', set:3}],
+  G4V2: [{condition:'C4', set:1}, {condition:'C1', set:2}, {condition:'C3', set:3}, {condition:'C2', set:0}],
+  G4V3: [{condition:'C4', set:2}, {condition:'C1', set:3}, {condition:'C3', set:0}, {condition:'C2', set:1}],
+  G4V4: [{condition:'C4', set:3}, {condition:'C1', set:0}, {condition:'C3', set:1}, {condition:'C2', set:2}],
 };
+const CONDITION_MODES = {C1:'Ded-Us', C2:'Ded-Sys', C3:'Dir-Us', C4:'Dir-Sys'};
 
-function buildOrder(tasks, uid, group){
+function buildOrder(tasks){
   const byId = {};
   tasks.forEach((t, i) => { byId[t.id] = i; });
   const missing = FIXED_SETS.flat().filter(id => !(id in byId));
@@ -314,14 +320,15 @@ function buildOrder(tasks, uid, group){
     return null;
   }
   const idxs = [];
-  for (const s of LATIN[group].sets)
-    for (const id of FIXED_SETS[s]) idxs.push(byId[id]);
+  for (const assignment of participantPlan)
+    for (const id of FIXED_SETS[assignment.set]) idxs.push(byId[id]);
   return idxs;
 }
 
 function setLabel(pos){
-  const setId = LATIN[userGroup].sets[Math.floor(pos/3)] + 1;
-  return `세트 S${setId} · ${pos%3+1}/3  (전체 ${pos+1}/${order.length})`;
+  const assignment = participantPlan[Math.floor(pos/3)];
+  const setId = assignment.set + 1;
+  return `${assignment.condition}(S${setId}) · ${pos%3+1}/3  (전체 ${pos+1}/${order.length})`;
 }
 
 const SOURCE_BY_CATEGORY = {
@@ -391,7 +398,7 @@ function renderProblemBody(el, text, useMarkdown = true){
 
 
 function conditionAtSetPosition(setPos){
-  return LATIN[userGroup].cond.split(/\s+/)[setPos];
+  return participantPlan[setPos].condition;
 }
 
 function buildTrialSteps(condition, isFirstOverallTrial){
@@ -421,9 +428,10 @@ function buildTrialSteps(condition, isFirstOverallTrial){
 function startTrialForCurrentSet(){
   const setPos = Math.floor(cur / 3);
   const condition = conditionAtSetPosition(setPos);
-  trialSteps = buildTrialSteps(condition, setPos === 0);
+  trialSteps = buildTrialSteps(CONDITION_MODES[condition], setPos === 0);
   trialStepIndex = 0;
-  $('#trialSetLabel').textContent = `참가자 ${userId} (${userGroup}) · 세트 ${setPos + 1}/4 시작 전`;
+  const assignment = participantPlan[setPos];
+  $('#trialSetLabel').textContent = `참가자 ${userId} · ${condition}(S${assignment.set + 1}) · ${setPos + 1}/4 시작 전`;
   $('#trialCondition').textContent = `현재 컨디션: ${condition}`;
   renderTrialStep();
   show('scr-trial');
@@ -462,7 +470,7 @@ $('#btnTrialNext').onclick = () => {
 };
 
 function showReadyForCurrentTask(){
-  $('#readyProgress').textContent = `참가자 ${userId} (${userGroup}) · ${setLabel(cur)}`;
+  $('#readyProgress').textContent = `참가자 ${userId} · ${setLabel(cur)}`;
   $('#btnShow').disabled = false;
   show('scr-ready');
 }
@@ -477,7 +485,6 @@ $('#file').addEventListener('change', async e => {
   updateStartBtn();
 });
 $('#userId').addEventListener('input', updateStartBtn);
-$('#userGroup').addEventListener('change', updateStartBtn);
 
 // 서버가 exp_tasks.json을 호스팅하면 자동 로드 (수동 업로드로 덮어쓰기 가능)
 (async () => {
@@ -494,13 +501,20 @@ $('#userGroup').addEventListener('change', updateStartBtn);
   } catch (e) { /* 수동 업로드로 진행 */ }
 })();
 function updateStartBtn(){
-  $('#btnStart').disabled = !(tasks.length && $('#userId').value.trim() && $('#userGroup').value);
+  const enteredId = $('#userId').value.trim().toUpperCase();
+  const plan = PARTICIPANT_PLANS[enteredId];
+  if (!enteredId) $('#assignmentStatus').textContent = '';
+  else if (!plan) $('#assignmentStatus').textContent = '등록되지 않은 참가자 ID입니다.';
+  else $('#assignmentStatus').textContent = plan
+    .map(item => `${item.condition}(S${item.set + 1})`).join(' → ');
+  $('#btnStart').disabled = !(tasks.length && plan);
 }
 
 $('#btnStart').onclick = () => {
-  userId = $('#userId').value.trim();
-  userGroup = $('#userGroup').value;
-  const o = buildOrder(tasks, userId, userGroup);
+  userId = $('#userId').value.trim().toUpperCase();
+  participantPlan = PARTICIPANT_PLANS[userId];
+  if (!participantPlan){ alert('등록된 참가자 ID를 입력하세요.'); return; }
+  const o = buildOrder(tasks);
   if (!o || !o.length) return;
   order = o;
   results = []; cur = -1;
@@ -591,10 +605,13 @@ function endTask(status){
   const t = tasks[order[cur]];
   results.push({
     user_id: userId,
-    group: userGroup,
-    condition_order: LATIN[userGroup].cond,
+    group: userId.slice(0, 2),
+    condition_order: participantPlan.map(item => item.condition).join(' '),
+    condition_mode_order: participantPlan.map(item => CONDITION_MODES[item.condition]).join(' '),
     order_index: cur + 1,
-    set_id: 'S' + (LATIN[userGroup].sets[Math.floor(cur/3)] + 1),
+    set_id: 'S' + (participantPlan[Math.floor(cur/3)].set + 1),
+    condition_code: participantPlan[Math.floor(cur/3)].condition,
+    condition_mode: CONDITION_MODES[participantPlan[Math.floor(cur/3)].condition],
     set_position: Math.floor(cur/3) + 1,
     pos_in_set: cur % 3 + 1,
     task_id: t.id, source: t.source, task_group: t.group, difficulty: t.difficulty,
