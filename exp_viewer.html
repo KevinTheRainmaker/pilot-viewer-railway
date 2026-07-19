@@ -377,7 +377,15 @@ function normalizeTasks(payload){
   const raw = Array.isArray(payload) ? payload : payload?.tasks;
   if (!Array.isArray(raw) || !raw.length) throw new Error('과제 배열이 없습니다');
   return raw.map(task => {
-    if (task.source) return task;
+    if (task.source) {
+      // Regenerate the Python runner in the browser so a cached catalog cannot
+      // retain the old JSON-only input reader.
+      if ((task.language || 'python') === 'python' && task.starter_code) {
+        const signature = task.starter_code.split('\n').find(line => line.startsWith('def solution'));
+        return {...task, execution_runner: signature ? runnerForSignature(signature) : task.execution_runner};
+      }
+      return task;
+    }
     if (!task.category || !task.description || !task.function_signature)
       throw new Error(`지원하지 않는 과제 형식: ${task.id || '(ID 없음)'}`);
     const constraints = (task.constraints || []).map(x => `- ${x}`).join('\n');
