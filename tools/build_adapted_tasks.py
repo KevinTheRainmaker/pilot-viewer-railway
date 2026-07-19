@@ -28,11 +28,18 @@ def execution_runner(task):
     """Add a direct stdin runner that calls solution with named input variables."""
     function = ast.parse(task["function_signature"] + "\n    pass").body[0]
     arguments = [argument.arg for argument in function.args.args]
-    assignments = "\n".join(f"    {name} = json.loads(input())" for name in arguments)
+    assignments = "\n".join(f"    {name} = read_value()" for name in arguments)
     call = ", ".join(arguments)
     return "\n".join((
         "if __name__ == '__main__':",
+        "    import ast",
         "    import json",
+        "    def read_value():",
+        "        raw = input()",
+        "        try:",
+        "            return json.loads(raw)",
+        "        except json.JSONDecodeError:",
+        "            return ast.literal_eval(raw)",
         assignments,
         f"    print(solution({call}))",
         "",

@@ -364,8 +364,10 @@ function runnerForSignature(signature){
     ? match[1].split(',').map(part => part.trim().split(':')[0].trim()) : [];
   return [
     "if __name__ == '__main__':",
-    '    import json',
-    ...names.map(name => `    ${name} = json.loads(input())`),
+    '    import ast', '    import json',
+    '    def read_value():', '        raw = input()', '        try:', '            return json.loads(raw)',
+    '        except json.JSONDecodeError:', '            return ast.literal_eval(raw)',
+    ...names.map(name => `    ${name} = read_value()`),
     `    print(solution(${names.join(', ')}))`,
     ''
   ].join('\n');
