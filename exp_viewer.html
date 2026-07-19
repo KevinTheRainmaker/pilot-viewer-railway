@@ -206,14 +206,14 @@
       </div>
       <div id="rightPane">
         <div id="edPane">
-          <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 공개 테스트)</span><span id="edLock" class="muted">풀이 시작을 누르면 편집 가능</span></div>
+          <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 실행)</span><span id="edLock" class="muted">풀이 시작을 누르면 편집 가능</span></div>
           <textarea id="codeEditor" spellcheck="false" placeholder="# 여기에 코드를 작성하세요"></textarea>
           <div id="stdinWrap" class="hidden">
             <div class="lbl">표준 입력 (stdin) — input()이 이 내용을 읽습니다</div>
-            <textarea id="stdinBox" spellcheck="false" placeholder="예제 입력을 붙여넣으세요"></textarea>
+            <textarea id="stdinBox" spellcheck="false" placeholder="실행에 사용할 입력값을 직접 입력하세요"></textarea>
           </div>
           <div id="runRow">
-            <button id="btnRun">▶ 공개 테스트 실행</button>
+            <button id="btnRun">▶ 실행</button>
             <span id="runStatus"></span>
           </div>
         </div>
@@ -365,12 +365,11 @@ function normalizeTasks(payload){
     if (!task.category || !task.description || !task.function_signature)
       throw new Error(`지원하지 않는 과제 형식: ${task.id || '(ID 없음)'}`);
     const constraints = (task.constraints || []).map(x => `- ${x}`).join('\n');
-    const examples = (task.examples || []).map(x => `- 입력: \`${x.input}\` → 출력: \`${x.output}\``).join('\n');
     return {
       id: task.id, source: SOURCE_BY_CATEGORY[task.category], group: task.category,
       difficulty: 'junior_ai_10min', title: task.title, title_ko: task.title,
-      body_ko: `${task.description}\n\n**함수 시그니처**\n\`\`\`python\n${task.function_signature}\n\`\`\`\n\n**제약 조건**\n${constraints}\n\n**예시**\n${examples}\n\n\`solution\` 함수를 구현한 뒤 「테스트 실행」으로 공개 테스트를 확인하세요.`,
-      starter_code: task.starter_code || '', public_tests: task.public_tests || [],
+      body_ko: `${task.description}\n\n**함수 시그니처**\n\`\`\`python\n${task.function_signature}\n\`\`\`\n\n**제약 조건**\n${constraints}\n\n\`solution\` 함수를 구현하세요. 실행이 필요하면 오른쪽 터미널에 입력값을 직접 넣어 확인할 수 있습니다.`,
+      starter_code: task.starter_code || '',
       task_set: task.set, origin: task.origin, estimated_minutes: task.estimated_minutes,
     };
   });
@@ -573,8 +572,8 @@ $('#btnShow').onclick = () => {
   $('#terminal').innerHTML = '';
   $('#runStatus').textContent = '';
   runCount = 0; lastRunOk = null;
-  $('#stdinWrap').classList.add('hidden');
-  $('#runRow').classList.toggle('hidden', !t.public_tests?.length);
+  $('#stdinWrap').classList.remove('hidden');
+  $('#runRow').classList.remove('hidden');
   $('#phaseLabel').textContent = '단계: 문제 파악';
   t_shown = Date.now(); t_solve = 0; awayMs = 0; awaySince = 0; t_firstKey = 0;
   show('scr-task');
@@ -884,52 +883,10 @@ function onRunResult(data){
   lastRunOk = data.ok;
 }
 
-function buildPublicTestCode(task, code){
-  const cases = JSON.stringify(task.public_tests || []);
-  const validator = task.public_tests?.[0]?.validator || '';
-  const validatorCode = validator === 'partition_min_difference' ? `
-def __viewer_valid(actual, n):
-    if not isinstance(actual, list) or not actual or len(actual) >= n:
-        return False
-    if any(not isinstance(value, int) or value < 1 or value > n for value in actual):
-        return False
-    if len(set(actual)) != len(actual):
-        return False
-    total = n * (n + 1) // 2
-    return abs(2 * sum(actual) - total) == total % 2
-` : validator === 'balanced_halves' ? `
-def __viewer_valid(actual, changes):
-    if not isinstance(actual, list) or len(actual) != len(changes) or sum(actual) != 0:
-        return False
-    return all(value in (change // 2, change // 2 + (change % 2))
-               for value, change in zip(actual, changes))
-` : `
-def __viewer_close(actual, expected):
-    if isinstance(expected, float):
-        return isinstance(actual, (int, float)) and abs(actual - expected) <= 1e-9
-    if isinstance(expected, list):
-        return isinstance(actual, list) and len(actual) == len(expected) and all(__viewer_close(a, e) for a, e in zip(actual, expected))
-    if isinstance(expected, dict):
-        return isinstance(actual, dict) and actual.keys() == expected.keys() and all(__viewer_close(actual[k], v) for k, v in expected.items())
-    return actual == expected
-`;
-  const assertion = validator ? `
-    if not __viewer_valid(actual, *args):
-        raise AssertionError(f'예상 조건을 만족하지 않습니다: {actual!r}')
-` : `
-    expected = case.get('expected_approx', case.get('expected'))
-    if not __viewer_close(actual, expected):
-        raise AssertionError(f'기대값: {expected!r} / 실제값: {actual!r}')
-`;
-  return `${code}\n\n# --- 뷰어 공개 테스트 (제출 코드에는 저장되지 않음) ---\nimport json\n${validatorCode}\n__viewer_cases = json.loads(${JSON.stringify(cases)})\nfor __viewer_index, case in enumerate(__viewer_cases, 1):\n    args = case['args']\n    actual = solution(*args)\n${assertion}\n    print(f'테스트 {__viewer_index}/{len(__viewer_cases)} 통과')\nprint('모든 공개 테스트를 통과했습니다.')\n`;
-}
-
 $('#btnRun').onclick = async () => {
   if (runBusy) return;
   const code = $('#codeEditor').value;
   if (!code.trim()) return;
-  const task = tasks[order[cur]];
-  if (!task.public_tests?.length) return;
   runCount++;
   if (!t_firstKey) t_firstKey = Date.now();
   termAppend(`$ python solution.py   # run ${runCount}\n`, 't-cmd');
@@ -951,7 +908,7 @@ $('#btnRun').onclick = async () => {
     const r = await fetch('run', {
       method: 'POST',
       headers: {'Content-Type':'application/json', ...authHeaders()},
-      body: JSON.stringify({code: buildPublicTestCode(task, code), stdin: '', timeout: RUN_TIMEOUT_SEC})
+      body: JSON.stringify({code, stdin: $('#stdinBox').value, timeout: RUN_TIMEOUT_SEC})
     });
     onRunResult(await r.json());
   } catch (err){
