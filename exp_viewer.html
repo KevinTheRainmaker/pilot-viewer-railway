@@ -137,6 +137,7 @@
       <div class="row">
         <input type="text" id="userId" placeholder="참가자 ID (예: G1V1)" autocomplete="off">
       </div>
+      <div class="row" id="languageSelect"><label><input type="radio" name="language" value="python" checked> Python</label><label><input type="radio" name="language" value="cpp17"> C++17</label></div>
       <div class="row">
         <label class="filebtn">exp_tasks.json 불러오기<input type="file" id="file" accept=".json" hidden></label>
         <span id="loadStatus" class="muted"></span>
@@ -280,7 +281,7 @@ window.MathJax = {
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
 let tasks = [], order = [], results = [], cur = -1;
-let userId = '', participantPlan = null, sessionTs = 0;
+let userId = '', participantPlan = null, sessionTs = 0, selectedLanguage = 'python';
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
@@ -357,6 +358,19 @@ const SOURCE_BY_CATEGORY = {
   algorithmic: 'APPS', data_manipulation: 'DS-1000', bug_fixing: 'BugsInPy'
 };
 
+function runnerForSignature(signature){
+  const match = signature.match(/def\s+solution\((.*?)\)\s*(?:->.*?)?:/);
+  const names = match && match[1].trim()
+    ? match[1].split(',').map(part => part.trim().split(':')[0].trim()) : [];
+  return [
+    "if __name__ == '__main__':",
+    '    import json',
+    ...names.map(name => `    ${name} = json.loads(input())`),
+    `    print(solution(${names.join(', ')}))`,
+    ''
+  ].join('\n');
+}
+
 function normalizeTasks(payload){
   const raw = Array.isArray(payload) ? payload : payload?.tasks;
   if (!Array.isArray(raw) || !raw.length) throw new Error('과제 배열이 없습니다');
@@ -370,6 +384,7 @@ function normalizeTasks(payload){
       difficulty: 'junior_ai_10min', title: task.title, title_ko: task.title,
       body_ko: `${task.description}\n\n**함수 시그니처**\n\`\`\`python\n${task.function_signature}\n\`\`\`\n\n**제약 조건**\n${constraints}\n\n\`solution\` 함수를 구현하세요. 실행이 필요하면 오른쪽 터미널에 입력값을 직접 넣어 확인할 수 있습니다.`,
       starter_code: task.starter_code || '',
+      execution_runner: runnerForSignature(task.function_signature),
       task_set: task.set, origin: task.origin, estimated_minutes: task.estimated_minutes,
     };
   });
@@ -506,6 +521,9 @@ $('#file').addEventListener('change', async e => {
   updateStartBtn();
 });
 $('#userId').addEventListener('input', updateStartBtn);
+document.querySelectorAll('input[name=language]').forEach(el => el.addEventListener('change', () => {
+  fetch(el.value === 'cpp17' ? 'exp_tasks_cpp.json' : 'exp_tasks.json', {cache:'no-store'}).then(r=>r.json()).then(j=>{tasks=normalizeTasks(j);$('#loadStatus').textContent=`${tasks.length}개 문제 자동 로드됨`;updateStartBtn();});
+}));
 
 // 서버가 exp_tasks.json을 호스팅하면 자동 로드 (수동 업로드로 덮어쓰기 가능)
 (async () => {
@@ -533,6 +551,8 @@ function updateStartBtn(){
 
 $('#btnStart').onclick = () => {
   userId = $('#userId').value.trim().toUpperCase();
+  selectedLanguage = document.querySelector('input[name=language]:checked').value;
+  document.querySelectorAll('input[name=language]').forEach(el => el.disabled = true);
   participantPlan = PARTICIPANT_PLANS[userId];
   if (!participantPlan){ alert('등록된 참가자 ID를 입력하세요.'); return; }
   const o = buildOrder(tasks);
@@ -626,6 +646,7 @@ function endTask(status){
   const t = tasks[order[cur]];
   results.push({
     user_id: userId,
+    language: selectedLanguage,
     group: userId.slice(0, 2),
     condition_order: participantPlan.map(item => item.condition).join(' '),
     condition_mode_order: participantPlan.map(item => CONDITION_MODES[item.condition]).join(' '),
@@ -887,9 +908,10 @@ $('#btnRun').onclick = async () => {
   if (runBusy) return;
   const code = $('#codeEditor').value;
   if (!code.trim()) return;
+  const task = tasks[order[cur]];
   runCount++;
   if (!t_firstKey) t_firstKey = Date.now();
-  termAppend(`$ python solution.py   # run ${runCount}\n`, 't-cmd');
+  termAppend(`${selectedLanguage === 'cpp17' ? '$ g++ -std=c++17 solution.cpp && ./solution' : '$ python solution.py'}   # run ${runCount}\n`, 't-cmd');
 
   // 서버가 늦게 깨어난 경우: 실행 시점 재확인
   if (execMode !== 'server'){
@@ -908,7 +930,7 @@ $('#btnRun').onclick = async () => {
     const r = await fetch('run', {
       method: 'POST',
       headers: {'Content-Type':'application/json', ...authHeaders()},
-      body: JSON.stringify({code, stdin: $('#stdinBox').value, timeout: RUN_TIMEOUT_SEC})
+      body: JSON.stringify({code: `${code}\n\n${task.execution_runner || ''}`, stdin: $('#stdinBox').value, timeout: RUN_TIMEOUT_SEC, language: selectedLanguage})
     });
     onRunResult(await r.json());
   } catch (err){

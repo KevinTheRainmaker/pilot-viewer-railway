@@ -25,6 +25,7 @@ import json
 import os
 import re
 import socket
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -88,6 +89,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
         if self.path == "/ping":
             self._json(200, {"service": "pilot-runner",
                              "python": sys.version.split()[0],
+                             "languages": ["python", "cpp17"], "cpp_compiler": bool(shutil.which("g++")),
                              "token_required": bool(RUN_TOKEN)})
             return
         if self.path == "/results":
@@ -131,6 +133,7 @@ class QuietHandler(SimpleHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(n).decode("utf-8"))
             code = payload.get("code", "")
+            language = payload.get("language", "python")
             stdin = payload.get("stdin", "")
             timeout = min(float(payload.get("timeout", RUN_TIMEOUT_DEFAULT)), 60)
         except Exception as e:
@@ -139,6 +142,17 @@ class QuietHandler(SimpleHTTPRequestHandler):
 
         tmp = None
         try:
+            if language == "cpp17":
+                compiler = shutil.which("g++")
+                if not compiler: raise RuntimeError("C++17 compiler is unavailable")
+                with tempfile.TemporaryDirectory() as d:
+                    source, binary = Path(d) / "solution.cpp", Path(d) / "solution"
+                    source.write_text(code, encoding="utf-8")
+                    built = subprocess.run([compiler, "-std=c++17", "-O2", str(source), "-o", str(binary)], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                    if built.returncode: self._json(200, {"ok": False, "out": (built.stdout or "") + (built.stderr or "")}); return
+                    proc = subprocess.run([str(binary)], input=stdin, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                    self._json(200, {"ok": proc.returncode == 0, "out": (proc.stdout or "") + (proc.stderr or "") or "(출력 없음)"}); return
+            if language != "python": self._json(400, {"ok": False, "out": "unsupported language"}); return
             with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False,
                                              encoding="utf-8") as f:
                 f.write(code)
