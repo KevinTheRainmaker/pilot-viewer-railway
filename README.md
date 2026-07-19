@@ -31,6 +31,10 @@ https://<도메인>/pilot_viewer.html?token=<RUN_TOKEN>
 https://<도메인>/pilot_viewer.html?token=<RUN_TOKEN>&viewer=exp
 ```
 
+시작 화면에서 Python 또는 C++17을 선택하면 세션 전체에 고정됩니다. Python은
+`exp_tasks.json`, C++17은 `exp_tasks_cpp.json`을 사용하며, 함수 인자마다 JSON 값
+한 줄씩 입력해 실행합니다. Railway는 저장소의 Dockerfile로 `g++`를 포함해 빌드합니다.
+
 ## 결과 수집
 
 세션 종료 시 `results/<참가자ID>_<timestamp>.json`으로 서버에 자동 저장되고,

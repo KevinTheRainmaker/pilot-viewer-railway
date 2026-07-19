@@ -3,6 +3,7 @@
 import json
 import re
 import sys
+import ast
 from pathlib import Path
 
 
@@ -14,17 +15,27 @@ SOURCE_BY_CATEGORY = {
 
 
 def problem_body(task):
-    examples = "\n".join(
-        f"- 입력: `{example['input']}` → 출력: `{example['output']}`"
-        for example in task["examples"]
-    )
     constraints = "\n".join(f"- {constraint}" for constraint in task["constraints"])
     return "\n\n".join((
         task["description"],
         f"**함수 시그니처**\n```python\n{task['function_signature']}\n```",
         f"**제약 조건**\n{constraints}",
-        f"**예시**\n{examples}",
-        "`solution` 함수를 구현한 뒤 「테스트 실행」으로 공개 테스트를 확인하세요.",
+        "`solution` 함수를 구현하세요. 실행할 때는 터미널에 함수 매개변수 순서대로 한 줄씩 입력합니다. 리스트·딕셔너리 값은 해당 줄에 JSON 형식으로 입력합니다.",
+    ))
+
+
+def execution_runner(task):
+    """Add a direct stdin runner that calls solution with named input variables."""
+    function = ast.parse(task["function_signature"] + "\n    pass").body[0]
+    arguments = [argument.arg for argument in function.args.args]
+    assignments = "\n".join(f"    {name} = json.loads(input())" for name in arguments)
+    call = ", ".join(arguments)
+    return "\n".join((
+        "if __name__ == '__main__':",
+        "    import json",
+        assignments,
+        f"    print(solution({call}))",
+        "",
     ))
 
 
@@ -38,6 +49,12 @@ def load_markdown_contexts(path):
         section = markdown[match.end():end]
         section = section.split("<details>", 1)[0]
         section = re.sub(
+            r"\n\*\*예시\*\*\n.*?(?=\n\*\*제공 코드\*\*|\Z)",
+            "",
+            section,
+            flags=re.DOTALL,
+        )
+        section = re.sub(
             r"\n\*\*제공 코드\*\*\n```python\n.*?\n```\s*$", "", section, flags=re.DOTALL
         )
         section = re.sub(r"^- 유형:.*$\n?", "", section, flags=re.MULTILINE)
@@ -49,6 +66,15 @@ def load_markdown_contexts(path):
 def to_viewer_task(task, context=None):
     title = context["title"] if context else task["title"]
     body = context["body"] if context else problem_body(task)
+    if task["id"] == "S2-D":
+        body = body.replace(
+            "결과 행에는 query의 기존 키를 유지하고 `data` 키를 추가하세요.",
+            "결과 행에는 query의 `timestamp`와 `stuff` 값을 유지하고, 연결된 센서 값 `data`를 추가하세요.",
+        )
+        body += "\n\n각 source는 `timestamp`와 `data` 키만, 각 query는 `timestamp`와 `stuff` 키만 가집니다."
+    if task["id"] == "S1-D":
+        body += "\n\n각 행은 `id`와 정수형 `value` 키만 가집니다."
+    body = "**사용 언어: Python**\n\n" + body
     return {
         "id": task["id"],
         "source": SOURCE_BY_CATEGORY[task["category"]],
@@ -61,7 +87,7 @@ def to_viewer_task(task, context=None):
         "body_ko": body,
         "body_kind": "markdown",
         "starter_code": task["starter_code"],
-        "public_tests": task["public_tests"],
+        "execution_runner": execution_runner(task),
         "task_set": task["set"],
         "origin": task["origin"],
         "estimated_minutes": task["estimated_minutes"],
