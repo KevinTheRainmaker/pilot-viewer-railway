@@ -33,6 +33,8 @@
            border-radius:99px; color:#fff; }
   .b-APPS{background:#2f6f4f;} .b-DS-1000{background:#3b5fa0;} .b-BugsInPy{background:#a04040;}
   .progress { font-size: 13px; color: var(--muted); }
+  .elapsed-time { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .elapsed-time.over { color:#b42318; font-weight:700; }
   .body { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
           padding: 20px; word-break: break-word; font-size: 14px; line-height: 1.7; margin: 16px 0; }
   .body.mono { font-family: ui-monospace,"D2Coding",Consolas,monospace; font-size: 13px; white-space: pre-wrap; }
@@ -178,7 +180,7 @@
     <div class="progress" id="readyProgress"></div>
     <div class="card" style="text-align:center; padding: 60px 24px;">
       <p style="font-size:15px; margin:0 0 20px;">준비되면 아래 버튼을 눌러 문제를 확인하세요.<br>
-      <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다.</span></p>
+      <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다. 권장 풀이 시간은 문제당 10분이며, 10분을 넘어도 계속 풀 수 있습니다.</span></p>
       <button id="btnShow" class="primary" style="font-size:16px; padding:14px 34px;">문제 보기</button>
       <div id="pyLoadStatus" class="muted" style="margin-top:14px;"></div>
       <div style="margin-top:26px;">
@@ -193,6 +195,7 @@
       <div class="tb-left">
         <span class="badge" id="taskBadge"></span>
         <span class="progress" id="taskProgress"></span>
+        <span class="elapsed-time" id="elapsedTime">경과 00:00</span>
         <span class="phase" id="phaseLabel">단계: 문제 파악</span>
       </div>
       <div class="tb-right">
@@ -232,6 +235,11 @@
       <p style="margin:0 0 4px; font-weight:600;">이번 문제를 해결하는 과정은 나에게 얼마나 어려웠나요?</p>
       <p class="muted" style="margin:0;">1: 매우 쉬움 - 7: 매우 어려움</p>
       <div class="rating" id="ratingBtns"></div>
+      <label style="display:flex; align-items:center; gap:8px; margin:28px 0 4px; cursor:pointer;">
+        <input type="checkbox" id="noSystemIntervention">
+        시스템 개입을 받지 않았음
+      </label>
+      <p class="muted" style="margin:0;">선택하면 아래 시스템 개입 관련 문항은 응답하지 않아도 됩니다.</p>
       <div id="systemGuidanceQuestions"></div>
       <div class="row"><button id="btnRateNext" class="primary" disabled>다음 문제로</button></div>
     </div>
@@ -283,9 +291,12 @@ const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
 let tasks = [], order = [], results = [], cur = -1;
 let userId = '', participantPlan = null, sessionTs = 0, selectedLanguage = 'python';
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
+const RECOMMENDED_TASK_SEC = 600;
+let elapsedTimer = null;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
 let pendingSystemGuidanceResponses = {};
+let pendingNoSystemIntervention = false;
 let trialSteps = [], trialStepIndex = 0;
 let completedTrialSets = new Set();
 
@@ -521,6 +532,14 @@ function showReadyForCurrentTask(){
   show('scr-ready');
 }
 
+function updateElapsedTime(){
+  if (!t_shown) return;
+  const elapsedSec = Math.floor((Date.now() - t_shown) / 1000);
+  const el = $('#elapsedTime');
+  el.textContent = `경과 ${String(Math.floor(elapsedSec / 60)).padStart(2,'0')}:${String(elapsedSec % 60).padStart(2,'0')}`;
+  el.classList.toggle('over', elapsedSec >= RECOMMENDED_TASK_SEC);
+}
+
 /* ---------- 화면 흐름 ---------- */
 $('#file').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -606,6 +625,9 @@ $('#btnShow').onclick = () => {
   $('#runRow').classList.remove('hidden');
   $('#phaseLabel').textContent = '단계: 문제 파악';
   t_shown = Date.now(); t_solve = 0; awayMs = 0; awaySince = 0; t_firstKey = 0;
+  clearInterval(elapsedTimer);
+  updateElapsedTime();
+  elapsedTimer = setInterval(updateElapsedTime, 1000);
   show('scr-task');
 };
 
@@ -653,7 +675,9 @@ function lineDiff(before, after){
 
 function endTask(status){
   const now = Date.now();
+  clearInterval(elapsedTimer); elapsedTimer = null;
   const t = tasks[order[cur]];
+  const totalSec = +((now - t_shown)/1000).toFixed(1);
   results.push({
     user_id: userId,
     language: selectedLanguage,
@@ -672,7 +696,10 @@ function endTask(status){
     ended_at: new Date(now).toISOString(),
     comprehension_sec: t_solve ? +((t_solve - t_shown)/1000).toFixed(1) : '',
     solving_sec: t_solve ? +((now - t_solve)/1000).toFixed(1) : '',
-    total_sec: +((now - t_shown)/1000).toFixed(1),
+    total_sec: totalSec,
+    recommended_time_sec: RECOMMENDED_TASK_SEC,
+    time_limit_exceeded: totalSec > RECOMMENDED_TASK_SEC,
+    time_overrun_sec: Math.max(0, +(totalSec - RECOMMENDED_TASK_SEC).toFixed(1)),
     unfocused_sec: +((awayMs + (awaySince ? now - awaySince : 0))/1000).toFixed(1),
     time_to_first_keystroke_sec: t_firstKey ? +((t_firstKey - t_solve)/1000).toFixed(1) : '',
     status: status,
@@ -686,9 +713,11 @@ function endTask(status){
   });
   // 평정 화면
   pendingRating = 0;
+  pendingNoSystemIntervention = false;
   pendingSystemGuidanceResponses = Object.fromEntries(
-    SYSTEM_GUIDANCE_QUESTIONS.map(({field}) => [field, 0])
+    SYSTEM_GUIDANCE_QUESTIONS.map(({field}) => [field, null])
   );
+  $('#noSystemIntervention').checked = false;
   const rb = $('#ratingBtns'); rb.innerHTML = '';
   for (let v=1; v<=7; v++){
     const b = document.createElement('button');
@@ -706,6 +735,8 @@ function endTask(status){
 function renderSystemGuidanceQuestions(){
   const wrap = $('#systemGuidanceQuestions');
   wrap.innerHTML = '';
+  wrap.classList.toggle('hidden', pendingNoSystemIntervention);
+  if (pendingNoSystemIntervention) return;
   for (const question of SYSTEM_GUIDANCE_QUESTIONS){
     const label = document.createElement('p');
     label.style.cssText = 'margin:24px 0 4px; font-weight:600;';
@@ -731,15 +762,28 @@ function renderSystemGuidanceQuestions(){
 }
 
 function updateRateNextButton(){
-  const complete = pendingRating > 0 && SYSTEM_GUIDANCE_QUESTIONS.every(
+  const complete = pendingRating > 0 && (pendingNoSystemIntervention || SYSTEM_GUIDANCE_QUESTIONS.every(
     ({field}) => pendingSystemGuidanceResponses[field] > 0
-  );
+  ));
   $('#btnRateNext').disabled = !complete;
 }
+
+$('#noSystemIntervention').onchange = event => {
+  pendingNoSystemIntervention = event.target.checked;
+  if (pendingNoSystemIntervention){
+    for (const {field} of SYSTEM_GUIDANCE_QUESTIONS){
+      pendingSystemGuidanceResponses[field] = null;
+    }
+  }
+  renderSystemGuidanceQuestions();
+  updateRateNextButton();
+};
 
 $('#btnRateNext').onclick = () => {
   Object.assign(results[results.length-1], {
     rating: pendingRating,
+    system_intervention_not_received: pendingNoSystemIntervention,
+    system_intervention_response_status: pendingNoSystemIntervention ? 'not_received' : 'answered',
     ...pendingSystemGuidanceResponses,
   });
   submitResults(false);   // 문제마다 서버에 증분 저장 (같은 세션 파일 덮어쓰기)
