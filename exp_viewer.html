@@ -33,7 +33,9 @@
            border-radius:99px; color:#fff; }
   .b-APPS{background:#2f6f4f;} .b-DS-1000{background:#3b5fa0;} .b-BugsInPy{background:#a04040;}
   .progress { font-size: 13px; color: var(--muted); }
-  .elapsed-time { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .recommended-time { color:#344054; font-weight:700; }
+  .elapsed-time { margin-right:4px; padding:6px 8px; border-radius:6px; background:#f2f4f7;
+                  font-size:13px; font-weight:600; color:#475467; font-variant-numeric:tabular-nums; }
   .elapsed-time.over { color:#b42318; font-weight:700; }
   .body { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
           padding: 20px; word-break: break-word; font-size: 14px; line-height: 1.7; margin: 16px 0; }
@@ -180,7 +182,7 @@
     <div class="progress" id="readyProgress"></div>
     <div class="card" style="text-align:center; padding: 60px 24px;">
       <p style="font-size:15px; margin:0 0 20px;">준비되면 아래 버튼을 눌러 문제를 확인하세요.<br>
-      <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다. 권장 풀이 시간은 문제당 10분이며, 10분을 넘어도 계속 풀 수 있습니다.</span></p>
+      <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다. <strong class="recommended-time">권장 풀이 시간은 문제당 10분</strong>이며, 10분을 넘어도 계속 풀 수 있습니다.</span></p>
       <button id="btnShow" class="primary" style="font-size:16px; padding:14px 34px;">문제 보기</button>
       <div id="pyLoadStatus" class="muted" style="margin-top:14px;"></div>
       <div style="margin-top:26px;">
@@ -195,10 +197,10 @@
       <div class="tb-left">
         <span class="badge" id="taskBadge"></span>
         <span class="progress" id="taskProgress"></span>
-        <span class="elapsed-time" id="elapsedTime">경과 00:00</span>
         <span class="phase" id="phaseLabel">단계: 문제 파악</span>
       </div>
       <div class="tb-right">
+        <span class="elapsed-time" id="elapsedTime">경과 00:00</span>
         <button id="btnSolve" class="primary">풀이 시작</button>
         <button id="btnDone" class="primary hidden">완료</button>
         <button id="btnGiveup" class="ghost">포기</button>
