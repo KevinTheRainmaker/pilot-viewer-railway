@@ -198,10 +198,10 @@
         <span class="badge" id="taskBadge"></span>
         <span class="progress" id="taskProgress"></span>
         <span class="phase" id="phaseLabel">단계: 문제 파악</span>
+        <span id="readingWindowStatus" class="muted">문제 읽기 시간: 처음 2분 동안 문제를 읽어주세요. 이후 자동으로 코드 작성창이 열립니다.</span>
       </div>
       <div class="tb-right">
         <span class="elapsed-time" id="elapsedTime">경과 00:00</span>
-        <button id="btnSolve" class="primary">풀이 시작</button>
         <button id="btnDone" class="primary hidden">완료</button>
         <button id="btnGiveup" class="ghost">포기</button>
       </div>
@@ -212,7 +212,7 @@
       </div>
       <div id="rightPane">
         <div id="edPane">
-          <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 실행)</span><span id="edLock" class="muted">풀이 시작을 누르면 편집 가능</span></div>
+          <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 실행)</span><span id="edLock" class="muted">문제 읽기 시간 후 자동으로 편집 가능</span></div>
           <textarea id="codeEditor" spellcheck="false" placeholder="# 여기에 코드를 작성하세요"></textarea>
           <div id="stdinWrap" class="hidden">
             <div class="lbl">표준 입력 (stdin) — 함수 매개변수 순서대로 한 줄씩 입력합니다</div>
@@ -243,7 +243,7 @@
       </label>
       <p class="muted" style="margin:0;">선택하면 아래 시스템 개입 관련 문항은 응답하지 않아도 됩니다.</p>
       <div id="systemGuidanceQuestions"></div>
-      <div class="row"><button id="btnRateNext" class="primary" disabled>다음 문제로</button></div>
+      <div class="row"><button id="btnRateBack" class="ghost">문제로 돌아가기</button><button id="btnRateNext" class="primary" disabled>다음 문제로</button></div>
     </div>
   </section>
 
@@ -294,6 +294,7 @@ let tasks = [], order = [], results = [], cur = -1;
 let userId = '', participantPlan = null, sessionTs = 0, selectedLanguage = 'python';
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
 const RECOMMENDED_TASK_SEC = 600;
+const READING_WINDOW_SEC = 120;
 let elapsedTimer = null;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
@@ -540,6 +541,19 @@ function updateElapsedTime(){
   const el = $('#elapsedTime');
   el.textContent = `경과 ${String(Math.floor(elapsedSec / 60)).padStart(2,'0')}:${String(elapsedSec % 60).padStart(2,'0')}`;
   el.classList.toggle('over', elapsedSec >= RECOMMENDED_TASK_SEC);
+  if (elapsedSec >= READING_WINDOW_SEC) unlockSolving();
+}
+
+function unlockSolving(){
+  if (t_solve) return;
+  t_solve = t_shown + READING_WINDOW_SEC * 1000;
+  $('#btnDone').classList.remove('hidden');
+  $('#codeEditor').readOnly = false;
+  $('#btnRun').disabled = false;
+  $('#edLock').classList.add('hidden');
+  $('#readingWindowStatus').classList.add('hidden');
+  $('#phaseLabel').textContent = '단계: 풀이 중';
+  $('#codeEditor').focus();
 }
 
 /* ---------- 화면 흐름 ---------- */
@@ -613,19 +627,20 @@ $('#btnShow').onclick = () => {
   $('#taskProgress').textContent = ` ${setLabel(cur)}`;
   const body = $('#taskBody');
   renderProblemBody(body, participantBody(t), true);
-  $('#btnSolve').classList.remove('hidden');
   $('#btnDone').classList.add('hidden');
   const ed = $('#codeEditor');
   ed.value = t.starter_code || '';
   ed.readOnly = true;
+  $('#btnRun').disabled = true;
   $('#edLock').classList.remove('hidden');
   $('#stdinBox').value = '';
   $('#terminal').innerHTML = '';
   $('#runStatus').textContent = '';
-  runCount = 0; lastRunOk = null;
+  runCount = 0; lastRunOk = null; runBusy = false;
   $('#stdinWrap').classList.remove('hidden');
   $('#runRow').classList.remove('hidden');
   $('#phaseLabel').textContent = '단계: 문제 파악';
+  $('#readingWindowStatus').classList.remove('hidden');
   t_shown = Date.now(); t_solve = 0; awayMs = 0; awaySince = 0; t_firstKey = 0;
   clearInterval(elapsedTimer);
   updateElapsedTime();
@@ -633,18 +648,9 @@ $('#btnShow').onclick = () => {
   show('scr-task');
 };
 
-$('#btnSolve').onclick = () => {
-  t_solve = Date.now();
-  $('#btnSolve').classList.add('hidden');
-  $('#btnDone').classList.remove('hidden');
-  $('#codeEditor').readOnly = false;
-  $('#edLock').classList.add('hidden');
-  $('#phaseLabel').textContent = '단계: 풀이 중';
-  $('#codeEditor').focus();
-};
-
 /* 에디터: 탭 키 = 공백 4칸, 첫 입력 시각 기록 */
 $('#codeEditor').addEventListener('keydown', e => {
+  if (!t_solve || e.target.readOnly) return;
   if (!t_firstKey) t_firstKey = Date.now();
   if (e.key === 'Tab'){
     e.preventDefault();
@@ -654,7 +660,7 @@ $('#codeEditor').addEventListener('keydown', e => {
   }
 });
 
-$('#btnDone').onclick   = () => endTask('done');
+$('#btnDone').onclick   = () => { if (confirm('정말 풀이를 완료하셨나요?')) endTask('done'); };
 $('#btnGiveup').onclick = () => {
   if (confirm('이 문제를 포기하시겠습니까?')) endTask('giveup');
 };
@@ -677,7 +683,6 @@ function lineDiff(before, after){
 
 function endTask(status){
   const now = Date.now();
-  clearInterval(elapsedTimer); elapsedTimer = null;
   const t = tasks[order[cur]];
   const totalSec = +((now - t_shown)/1000).toFixed(1);
   results.push({
@@ -794,6 +799,12 @@ $('#btnRateNext').onclick = () => {
     return;
   }
   nextTask();
+};
+
+$('#btnRateBack').onclick = () => {
+  results.pop();
+  show('scr-task');
+  if (Math.floor((Date.now() - t_shown) / 1000) >= READING_WINDOW_SEC) unlockSolving();
 };
 
 function showConditionComplete(){
@@ -951,7 +962,8 @@ $('#codeEditor').addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); $('#btnRun').click(); }
 });
 
-function onRunResult(data){
+function onRunResult(data, requestCur, requestSolveStartedAt){
+  if (cur !== requestCur || t_solve !== requestSolveStartedAt) return;
   runBusy = false;
   $('#btnRun').disabled = false;
   $('#runStatus').textContent = '';
@@ -961,10 +973,14 @@ function onRunResult(data){
 }
 
 $('#btnRun').onclick = async () => {
-  if (runBusy) return;
+  if (runBusy || !t_solve) return;
+  const requestCur = cur;
+  const requestSolveStartedAt = t_solve;
   const code = $('#codeEditor').value;
   if (!code.trim()) return;
   const task = tasks[order[cur]];
+  runBusy = true;
+  $('#btnRun').disabled = true;
   runCount++;
   if (!t_firstKey) t_firstKey = Date.now();
   termAppend(`${selectedLanguage === 'cpp17' ? '$ g++ -std=c++17 solution.cpp && ./solution' : '$ python solution.py'}   # run ${runCount}\n`, 't-cmd');
@@ -975,12 +991,10 @@ $('#btnRun').onclick = async () => {
     await probeServer(4000);
   }
   if (execMode !== 'server'){
-    onRunResult({ok:false, out:'(실행 서버에 연결할 수 없습니다 — 서버 URL로 접속했는지, 서버가 켜져 있는지 확인하세요)'});
+    onRunResult({ok:false, out:'(실행 서버에 연결할 수 없습니다 — 서버 URL로 접속했는지, 서버가 켜져 있는지 확인하세요)'}, requestCur, requestSolveStartedAt);
     return;
   }
 
-  runBusy = true;
-  $('#btnRun').disabled = true;
   $('#runStatus').textContent = '실행 중…';
   try {
     const r = await fetch('run', {
@@ -988,10 +1002,10 @@ $('#btnRun').onclick = async () => {
       headers: {'Content-Type':'application/json', ...authHeaders()},
       body: JSON.stringify({code: `${code}\n\n${task.execution_runner || ''}`, stdin: $('#stdinBox').value, timeout: RUN_TIMEOUT_SEC, language: selectedLanguage})
     });
-    onRunResult(await r.json());
+    onRunResult(await r.json(), requestCur, requestSolveStartedAt);
   } catch (err){
     execMode = 'none';   // 다음 실행 때 재탐지
-    onRunResult({ok:false, out:'(실행 요청 실패 — 네트워크 또는 서버 상태를 확인하세요)'});
+    onRunResult({ok:false, out:'(실행 요청 실패 — 네트워크 또는 서버 상태를 확인하세요)'}, requestCur, requestSolveStartedAt);
   }
 };
 
