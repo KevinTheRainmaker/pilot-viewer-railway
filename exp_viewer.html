@@ -296,6 +296,7 @@ let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
 const RECOMMENDED_TASK_SEC = 600;
 const READING_WINDOW_SEC = 120;
 let elapsedTimer = null;
+let ratingPausedAt = 0;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
 let pendingSystemGuidanceResponses = {};
@@ -683,6 +684,8 @@ function lineDiff(before, after){
 
 function endTask(status){
   const now = Date.now();
+  clearInterval(elapsedTimer); elapsedTimer = null;
+  ratingPausedAt = now;
   const t = tasks[order[cur]];
   const totalSec = +((now - t_shown)/1000).toFixed(1);
   results.push({
@@ -803,8 +806,15 @@ $('#btnRateNext').onclick = () => {
 
 $('#btnRateBack').onclick = () => {
   results.pop();
+  const pausedMs = Date.now() - ratingPausedAt;
+  t_shown += pausedMs;
+  if (t_solve) t_solve += pausedMs;
+  if (t_firstKey) t_firstKey += pausedMs;
+  ratingPausedAt = 0;
   show('scr-task');
   if (Math.floor((Date.now() - t_shown) / 1000) >= READING_WINDOW_SEC) unlockSolving();
+  updateElapsedTime();
+  elapsedTimer = setInterval(updateElapsedTime, 1000);
 };
 
 function showConditionComplete(){
