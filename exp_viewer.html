@@ -182,7 +182,7 @@
     <div class="progress" id="readyProgress"></div>
     <div class="card" style="text-align:center; padding: 60px 24px;">
       <p style="font-size:15px; margin:0 0 20px;">준비되면 아래 버튼을 눌러 문제를 확인하세요.<br>
-      <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다. <strong class="recommended-time">권장 풀이 시간은 문제당 10분</strong>이며, 10분을 넘어도 계속 풀 수 있습니다.</span></p>
+      <span class="muted">버튼을 누르는 순간부터 시간이 기록됩니다. <strong class="recommended-time">권장 풀이 시간은 문제당 12분</strong>이며, 12분을 넘어도 계속 풀 수 있습니다.</span></p>
       <button id="btnShow" class="primary" style="font-size:16px; padding:14px 34px;">문제 보기</button>
       <div id="pyLoadStatus" class="muted" style="margin-top:14px;"></div>
       <div style="margin-top:26px;">
@@ -215,7 +215,7 @@
           <div class="pane-label"><span>코드 — 완료 시 그대로 기록됩니다 (Ctrl+Enter 실행)</span><span id="edLock" class="muted">문제 읽기 시간 후 자동으로 편집 가능</span></div>
           <textarea id="codeEditor" spellcheck="false" placeholder="# 여기에 코드를 작성하세요"></textarea>
           <div id="stdinWrap" class="hidden">
-            <div class="lbl">표준 입력 (stdin) — 함수 매개변수 순서대로 한 줄씩 입력합니다</div>
+            <div class="lbl" id="stdinLabel">표준 입력 (stdin) — 함수 매개변수 순서대로 한 줄씩 입력합니다</div>
             <textarea id="stdinBox" spellcheck="false" placeholder="함수 인자 순서대로 한 줄씩 입력하세요"></textarea>
           </div>
           <div id="runRow">
@@ -293,10 +293,11 @@ const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
 let tasks = [], order = [], results = [], cur = -1;
 let userId = '', participantPlan = null, sessionTs = 0, selectedLanguage = 'python';
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
-const RECOMMENDED_TASK_SEC = 600;
+const RECOMMENDED_TASK_SEC = 720;
 const READING_WINDOW_SEC = 120;
 let elapsedTimer = null;
 let ratingPausedAt = 0;
+let recommendedTimeNoticeShown = false;
 let runCount = 0, lastRunOk = null;
 let pendingRating = 0;
 let pendingSystemGuidanceResponses = {};
@@ -387,6 +388,21 @@ function runnerForSignature(signature){
     ''
   ].join('\n');
 }
+
+const PYTHON_STDIN_EXAMPLES = {
+  'S1-A': '[4,0,2,1,0,3,0,1]',
+  'S1-D': '[{"id":"a","value":3},{"id":"b","value":8}]\n["b","a"]',
+  'S1-B': '[[5],[3],[8]]',
+  'S2-A': '8',
+  'S2-D': '[{"timestamp":2,"data":10},{"timestamp":6,"data":20}]\n[{"timestamp":1,"stuff":"a"},{"timestamp":5,"stuff":"b"}]',
+  'S2-B': '[[0,128,255],[64,192,32]]',
+  'S3-A': '[3,-1,-2]',
+  'S3-D': '[{"title":"A &LT; B","price":10},{"description":"&LT;tag&gt;","active":true}]',
+  'S3-B': '["py27","py38"]',
+  'S4-A': '[1,0,1,1,0]\n2',
+  'S4-D': '[1,"2",2.0,true,null,-3]',
+  'S4-B': '"/etc/os-release"\n"NAME=Kali Linux\\nVERSION_ID=\\\"2025.1\\\""',
+};
 
 function normalizeTasks(payload){
   const raw = Array.isArray(payload) ? payload : payload?.tasks;
@@ -545,6 +561,10 @@ function updateElapsedTime(){
   const el = $('#elapsedTime');
   el.textContent = `경과 ${String(Math.floor(elapsedSec / 60)).padStart(2,'0')}:${String(elapsedSec % 60).padStart(2,'0')}`;
   el.classList.toggle('over', elapsedSec >= RECOMMENDED_TASK_SEC);
+  if (!recommendedTimeNoticeShown && elapsedSec >= RECOMMENDED_TASK_SEC){
+    recommendedTimeNoticeShown = true;
+    alert('권장 풀이 시간 12분이 지났습니다. 계속 풀 수 있습니다.');
+  }
   if (elapsedSec >= READING_WINDOW_SEC) unlockSolving();
 }
 
@@ -637,7 +657,10 @@ $('#btnShow').onclick = () => {
   ed.readOnly = true;
   $('#btnRun').disabled = true;
   $('#edLock').classList.remove('hidden');
-  $('#stdinBox').value = '';
+  $('#stdinBox').value = selectedLanguage === 'python' ? (PYTHON_STDIN_EXAMPLES[t.id] || '') : '';
+  $('#stdinLabel').textContent = selectedLanguage === 'python'
+    ? '표준 입력 (stdin) — 함수 매개변수 순서대로 한 줄씩 입력합니다. 아래는 실행해 볼 수 있는 예시 입력입니다.'
+    : '표준 입력 (stdin) — 함수 매개변수 순서대로 한 줄씩 입력합니다';
   $('#terminal').innerHTML = '';
   $('#runStatus').textContent = '';
   runCount = 0; lastRunOk = null; runBusy = false;
@@ -646,6 +669,7 @@ $('#btnShow').onclick = () => {
   $('#phaseLabel').textContent = '단계: 문제 파악';
   $('#readingWindowStatus').classList.remove('hidden');
   t_shown = Date.now(); t_solve = 0; awayMs = 0; awaySince = 0; t_firstKey = 0;
+  recommendedTimeNoticeShown = false;
   clearInterval(elapsedTimer);
   updateElapsedTime();
   elapsedTimer = setInterval(updateElapsedTime, 1000);
