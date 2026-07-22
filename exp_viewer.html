@@ -419,6 +419,9 @@ function normalizeTasks(payload){
 /* ---------- 참가자용 본문 (BugsInPy는 정답 제거) ---------- */
 function participantBody(t){
   let text = t.body_ko || t.body || '';
+  if (!text.includes('함수 매개변수를 순서대로 한 줄씩 입력합니다.')) {
+    text += '\n\n**입력 형식**\n**다음과 같은 형태로, 함수 매개변수를 순서대로 한 줄씩 입력합니다.** 별도의 `main` 함수나 파싱을 구현할 필요는 없습니다.';
+  }
   if (t.source === 'BugsInPy'){
     // 구버전 tasks.json 호환: 정답 섹션이 남아있으면 제거
     for (const cut of ['[수정 내용]','[패치 원문]']){

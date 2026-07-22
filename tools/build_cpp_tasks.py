@@ -99,7 +99,7 @@ def main():
             context = "음성 샘플의 유효 길이는 내부 벡터 하나에 정수 하나가 들어 있는 형태로 전달됩니다. 결과는 항상 `{5, 3, 8}` 같은 1차원 벡터여야 합니다. 그런데 현재 구현은 배치 크기가 1일 때 빈 벡터를 반환합니다. 이 때문에 요청이 한 건만 들어오면 유효 길이 정보가 사라지고, 이후 처리 단계에서 샘플 수와 길이 정보의 개수가 맞지 않게 됩니다."
         body = f"**사용 언어: C++17**\n\n{context}\n\n{CPP_NOTES.get(task['id'], '')}\n\n**C++17 함수 규격**\n```cpp\n{signature};\n```"
         body += "\n\n" + CPP_INPUT_GUIDES[task["id"]]
-        body += "\n\n다음을 그대로 입력창에 입력합니다. 별도의 `main` 함수나 파싱을 구현할 필요는 없습니다."
+        body += "\n\n**다음과 같은 형태로, 함수 매개변수를 순서대로 한 줄씩 입력합니다.** 별도의 `main` 함수나 파싱을 구현할 필요는 없습니다."
         converted.append({
             **{key: value for key, value in task.items() if key not in {"starter_code", "execution_runner", "body", "body_ko"}},
             "language": "cpp17",

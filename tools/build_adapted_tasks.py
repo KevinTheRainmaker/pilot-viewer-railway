@@ -20,7 +20,7 @@ def problem_body(task):
         task["description"],
         f"**함수 시그니처**\n```python\n{task['function_signature']}\n```",
         f"**제약 조건**\n{constraints}",
-        "`solution` 함수를 구현하세요. 실행할 때는 터미널에 함수 매개변수 순서대로 한 줄씩 입력합니다. 리스트·딕셔너리 값은 해당 줄에 JSON 형식으로 입력합니다.",
+        "**입력 형식**\n**다음과 같은 형태로, 함수 매개변수를 순서대로 한 줄씩 입력합니다.**\n리스트·딕셔너리는 JSON 형식, Python set은 `{\"py3\", \"py38\"}`처럼 Python 리터럴 형식으로 해당 줄에 입력합니다. 별도의 `main` 함수나 파싱을 구현할 필요는 없습니다.",
     ))
 
 
