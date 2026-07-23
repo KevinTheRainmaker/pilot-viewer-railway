@@ -17,6 +17,17 @@ class ExpViewerConditionSurveyTests(unittest.TestCase):
         ]:
             self.assertIn(field, self.text)
 
+    def test_names_the_intervention_popup_in_every_survey_question(self):
+        questions = [
+            '시스템 개입(팝업)이 제시한 내용을 주의 깊게 읽었다.',
+            '시스템 개입(팝업)이 제시한 안내는 내가 하려던 행동을 한 번 더 돌아보게 만들었다.',
+            '시스템 개입(팝업)이 제시한 내용을 읽기 전에, 이미 어떻게 행동할지 결정한 경우가 많았다.',
+            '시스템 개입(팝업)이 제시한 안내는 나의 다음 행동에 영향을 주었다.',
+            '시스템 개입(팝업)이 제시한 안내는 내가 깊이 생각하기보다 바로 행동하도록 만들었다.',
+        ]
+        for question in questions:
+            self.assertIn(question, self.text)
+
     def test_uses_seven_point_difficulty_scale_with_requested_copy(self):
         self.assertIn('이번 문제를 해결하는 과정은 나에게 얼마나 어려웠나요?', self.text)
         self.assertIn('1: 매우 쉬움 - 7: 매우 어려움', self.text)

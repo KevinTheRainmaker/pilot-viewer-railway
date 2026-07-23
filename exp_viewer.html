@@ -92,18 +92,21 @@
     border-right: 1px solid var(--border); }
   #descPane h1 { font-size: 17px; margin: 0 0 12px; }
   #descPane .body { margin: 0; }
-  #rightPane { width: 50%; display: flex; flex-direction: column; min-width: 0;
+  #rightPane { width: 50%; display: flex; flex-direction: column; min-width: 0; min-height: 0;
     padding: 12px 14px; gap: 8px; }
-  #edPane { display: flex; flex-direction: column; flex: 3; min-height: 0; }
-  #edPane #codeEditor { flex: 1; min-height: 120px; resize: none; }
+  #edPane { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; flex: 3;
+    min-height: 0; overflow: hidden; }
+  #edPane #codeEditor { min-height: 0; resize: none; }
   #termPane { display: flex; flex-direction: column; flex: 2; min-height: 0;
-    border-top: 1px solid var(--border); padding-top: 8px; }
-  #termPane #terminal { flex: 1; min-height: 80px; max-height: none; }
+    overflow: hidden; border-top: 1px solid var(--border); padding-top: 8px; }
+  #termPane #terminal { flex: 1; min-height: 0; max-height: none; margin: 0; overflow: auto; }
   #codeEditor[readonly] { opacity: .55; }
   @media (max-width: 900px){
-    #split { flex-direction: column; }
+    #split { flex-direction: column; overflow-y: auto; }
     #descPane, #rightPane { width: 100%; }
-    #descPane { max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+    #descPane { flex: 0 0 auto; height: clamp(280px, 45dvh, 480px); max-height: none;
+      border-right: none; border-bottom: 1px solid var(--border); }
+    #rightPane { flex: 1 0 500px; }
   }
   @media (max-width: 900px){ #workspace { grid-template-columns: 1fr; } }
   .pane-label { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex;
@@ -314,11 +317,11 @@ const show = id => {
 };
 
 const SYSTEM_GUIDANCE_QUESTIONS = [
-  {field: 'system_content_reading', text: '시스템이 제시한 내용을 주의 깊게 읽었다.'},
-  {field: 'system_guidance_reflection', text: '시스템이 제시한 안내는 내가 하려던 행동을 한 번 더 돌아보게 만들었다.'},
-  {field: 'predecided_action', text: '시스템이 제시한 내용을 읽기 전에, 이미 어떻게 행동할지 결정한 경우가 많았다.'},
-  {field: 'system_guidance_influence', text: '시스템이 제시한 안내는 나의 다음 행동에 영향을 주었다.'},
-  {field: 'system_guidance_immediate_action', text: '시스템이 제시한 안내는 내가 깊이 생각하기보다 바로 행동하도록 만들었다.'},
+  {field: 'system_content_reading', text: '시스템 개입(팝업)이 제시한 내용을 주의 깊게 읽었다.'},
+  {field: 'system_guidance_reflection', text: '시스템 개입(팝업)이 제시한 안내는 내가 하려던 행동을 한 번 더 돌아보게 만들었다.'},
+  {field: 'predecided_action', text: '시스템 개입(팝업)이 제시한 내용을 읽기 전에, 이미 어떻게 행동할지 결정한 경우가 많았다.'},
+  {field: 'system_guidance_influence', text: '시스템 개입(팝업)이 제시한 안내는 나의 다음 행동에 영향을 주었다.'},
+  {field: 'system_guidance_immediate_action', text: '시스템 개입(팝업)이 제시한 안내는 내가 깊이 생각하기보다 바로 행동하도록 만들었다.'},
 ];
 const CONDITION_ORDINALS = ['1번째 조건', '2번째 조건', '3번째 조건', '4번째 조건'];
 
