@@ -86,7 +86,8 @@
   @media (max-width: 900px){
     #split { flex-direction: column; overflow-y: auto; }
     #descPane, #rightPane { width: 100%; }
-    #descPane { flex: 0 0 auto; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+    #descPane { flex: 0 0 auto; height: clamp(280px, 45dvh, 480px); max-height: none;
+      border-right: none; border-bottom: 1px solid var(--border); }
     #rightPane { flex: 1 0 500px; }
   }
   @media (max-width: 900px){ #workspace { grid-template-columns: 1fr; } }
