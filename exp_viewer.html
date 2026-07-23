@@ -293,8 +293,9 @@ const authHeaders = () => TOKEN ? {'X-Run-Token': TOKEN} : {};
 let tasks = [], order = [], results = [], cur = -1;
 let userId = '', participantPlan = null, sessionTs = 0, selectedLanguage = 'python';
 let t_shown = 0, t_solve = 0, awayMs = 0, awaySince = 0, t_firstKey = 0;
-const RECOMMENDED_TASK_SEC = 720;
 const READING_WINDOW_SEC = 120;
+const SOLVING_WINDOW_SEC = 600;
+const RECOMMENDED_TASK_SEC = READING_WINDOW_SEC + SOLVING_WINDOW_SEC;
 let elapsedTimer = null;
 let ratingPausedAt = 0;
 let recommendedTimeNoticeShown = false;
@@ -563,7 +564,7 @@ function updateElapsedTime(){
   el.classList.toggle('over', elapsedSec >= RECOMMENDED_TASK_SEC);
   if (!recommendedTimeNoticeShown && elapsedSec >= RECOMMENDED_TASK_SEC){
     recommendedTimeNoticeShown = true;
-    alert('권장 풀이 시간 12분이 지났습니다. 계속 풀 수 있습니다.');
+    alert('문제 보기부터 12분(문제 읽기 2분 + 풀이 10분)이 지났습니다. 계속 풀 수 있습니다.');
   }
   if (elapsedSec >= READING_WINDOW_SEC) unlockSolving();
 }
