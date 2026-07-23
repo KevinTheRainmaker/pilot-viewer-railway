@@ -74,18 +74,20 @@
     border-right: 1px solid var(--border); }
   #descPane h1 { font-size: 17px; margin: 0 0 12px; }
   #descPane pre.body { margin: 0; }
-  #rightPane { width: 50%; display: flex; flex-direction: column; min-width: 0;
+  #rightPane { width: 50%; display: flex; flex-direction: column; min-width: 0; min-height: 0;
     padding: 12px 14px; gap: 8px; }
-  #edPane { display: flex; flex-direction: column; flex: 3; min-height: 0; }
-  #edPane #codeEditor { flex: 1; min-height: 120px; resize: none; }
+  #edPane { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; flex: 3;
+    min-height: 0; overflow: hidden; }
+  #edPane #codeEditor { min-height: 0; resize: none; }
   #termPane { display: flex; flex-direction: column; flex: 2; min-height: 0;
-    border-top: 1px solid var(--border); padding-top: 8px; }
-  #termPane #terminal { flex: 1; min-height: 80px; max-height: none; }
+    overflow: hidden; border-top: 1px solid var(--border); padding-top: 8px; }
+  #termPane #terminal { flex: 1; min-height: 0; max-height: none; margin: 0; overflow: auto; }
   #codeEditor[readonly] { opacity: .55; }
   @media (max-width: 900px){
-    #split { flex-direction: column; }
+    #split { flex-direction: column; overflow-y: auto; }
     #descPane, #rightPane { width: 100%; }
-    #descPane { max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+    #descPane { flex: 0 0 auto; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+    #rightPane { flex: 1 0 500px; }
   }
   @media (max-width: 900px){ #workspace { grid-template-columns: 1fr; } }
   .pane-label { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex;
