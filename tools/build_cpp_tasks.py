@@ -9,7 +9,7 @@ from pathlib import Path
 CPP_STARTERS = {
     "S1-A": ("long long solution(std::vector<int> holes)", "long long solution(std::vector<int> holes) {\n    // TODO\n    return 0;\n}"),
     "S1-D": ("std::vector<Row> solution(const std::vector<Row>& rows, const std::vector<std::string>& wanted_ids)", "struct Row { std::string id; int value; };\n\nstd::vector<Row> solution(const std::vector<Row>& rows, const std::vector<std::string>& wanted_ids) {\n    // TODO\n    return {};\n}"),
-    "S1-B": ("std::vector<int> solution(const std::vector<std::vector<int>>& lengths)", "std::vector<int> solution(const std::vector<std::vector<int>>& lengths) {\n    // BUG: 배치가 하나일 때 빈 결과를 반환합니다.\n    if (lengths.size() == 1) return {};\n    std::vector<int> result;\n    for (const auto& row : lengths) result.push_back(row[0]);\n    return result;\n}"),
+    "S1-B": ("std::vector<std::string> solution(const std::string& src_path)", "std::vector<std::string> solution(const std::string& src_path) {\n    std::filesystem::path path(src_path);\n    // BUG: 파일명만 사용해 서로 다른 디렉터리의 같은 파일을 구분할 수 없습니다.\n    std::string original_header = path.filename().string() + \"  (original)\";\n    std::string formatted_header = path.filename().string() + \"  (formatted)\";\n    return {original_header, formatted_header};\n}"),
     "S2-A": ("std::vector<int> solution(int n)", "std::vector<int> solution(int n) {\n    // TODO\n    return {};\n}"),
     "S2-D": ("std::vector<Result> solution(const std::vector<Source>& sources, const std::vector<Query>& queries)", "struct Source { int timestamp; int data; };\nstruct Query { int timestamp; int stuff; };\nstruct Result { int timestamp; int stuff; std::optional<int> data; };\n\nstd::vector<Result> solution(const std::vector<Source>& sources, const std::vector<Query>& queries) {\n    // TODO\n    return {};\n}"),
     "S2-B": ("std::vector<std::vector<double>> solution(const std::vector<std::vector<int>>& image)", "std::vector<std::vector<double>> solution(const std::vector<std::vector<int>>& image) {\n    std::vector<std::vector<double>> result;\n    for (const auto& row : image) {\n        std::vector<double> converted;\n        for (int pixel : row) {\n            // BUG: 정수 변환이 소수 부분을 버립니다.\n            converted.push_back(static_cast<int>(pixel / 127.5 - 1.0));\n        }\n        result.push_back(converted);\n    }\n    return result;\n}"),
@@ -31,7 +31,7 @@ CPP_NOTES = {
 
 CPP_INPUT_GUIDES = {
     "S1-A": "**입력 형식**\n첫 줄에 8개 정수를 공백으로 구분해 입력합니다.\n```text\n3 1 0 2 4 0 1 2\n```",
-    "S1-B": "**입력 형식**\n첫 줄에서 행은 `;`, 각 행의 정수는 공백으로 구분합니다.\n```text\n5;3;8\n```",
+    "S1-B": "**입력 형식**\n첫 줄에 POSIX 스타일 파일 경로를 입력합니다.\n```text\nfrontend/utils.py\n```",
     "S1-D": "**입력 형식**\n첫 줄은 `id,value` 레코드를 `;`로, 둘째 줄은 원하는 id를 공백으로 구분합니다.\n```text\na,10;b,20\nb a\n```",
     "S2-A": "**입력 형식**\n첫 줄에 정수 하나를 입력합니다.\n```text\n8\n```",
     "S2-D": "**입력 형식**\n각 줄에서 `timestamp,data` 또는 `timestamp,stuff` 레코드를 `;`로 구분합니다.\n```text\n1,100;5,200\n2,7;6,8\n```",
@@ -63,7 +63,7 @@ def cpp_runner(task_id):
     # Every main consumes exactly one JSON value per solution argument.
     runners = {
         "S1-A": "int main(){std::string line;std::getline(std::cin,line);std::istringstream in(line);std::vector<int>x;int value;while(in>>value)x.push_back(value);std::cout<<solution(x);}",
-        "S1-B": "int main(){std::string line;std::getline(std::cin,line);std::cout<<runner::out(solution(runner::matrix(line)));}",
+        "S1-B": "int main(){std::string line;std::getline(std::cin,line);std::cout<<runner::out(solution(line));}",
         "S2-A": "int main(){int n;std::cin>>n;std::cout<<runner::out(solution(n));}",
         "S2-B": "int main(){std::string line;std::getline(std::cin,line);std::cout<<runner::out(solution(runner::matrix(line)));}",
         "S3-A": "int main(){std::string line;std::getline(std::cin,line);std::cout<<runner::out(solution(runner::ints(line)));}",
@@ -96,7 +96,7 @@ def main():
         if task["id"] == "S4-D":
             context = "외부 API 값은 C++ `Value` variant로 전달됩니다. int, double, string, bool, 값 없음 중 실제 int로 태그된 값만 원래 순서대로 추출하세요. C++에서는 int와 bool이 별도 variant 대안이므로, 이 문항은 Python의 bool-정수 상속 함정 대신 variant 타입 태그 판별을 평가합니다."
         if task["id"] == "S1-B":
-            context = "음성 샘플의 유효 길이는 내부 벡터 하나에 정수 하나가 들어 있는 형태로 전달됩니다. 결과는 항상 `{5, 3, 8}` 같은 1차원 벡터여야 합니다. 그런데 현재 구현은 배치 크기가 1일 때 빈 벡터를 반환합니다. 이 때문에 요청이 한 건만 들어오면 유효 길이 정보가 사라지고, 이후 처리 단계에서 샘플 수와 길이 정보의 개수가 맞지 않게 됩니다."
+            context = "코드 포매터는 수정 전과 수정 후의 파일 이름을 diff 헤더에 표시합니다. 서로 다른 디렉터리에 같은 파일명이 있을 수 있으므로, 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다. 현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 최소 수정하세요. 반환 벡터의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다."
         body = f"**사용 언어: C++17**\n\n{context}\n\n{CPP_NOTES.get(task['id'], '')}\n\n**C++17 함수 규격**\n```cpp\n{signature};\n```"
         body += "\n\n" + CPP_INPUT_GUIDES[task["id"]]
         body += "\n\n**다음과 같은 형태로, 함수 매개변수를 순서대로 한 줄씩 입력합니다.** 별도의 `main` 함수나 파싱을 구현할 필요는 없습니다."
