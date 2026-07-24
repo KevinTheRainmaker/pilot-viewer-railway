@@ -42,14 +42,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -335,14 +335,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         }
@@ -382,14 +382,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -593,14 +593,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -722,14 +722,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -1015,14 +1015,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         }
@@ -1144,14 +1144,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -1273,14 +1273,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -1402,14 +1402,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -1572,14 +1572,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -1783,14 +1783,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -1953,14 +1953,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -2123,14 +2123,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -2375,14 +2375,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         }
@@ -2504,14 +2504,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         },
@@ -2715,14 +2715,14 @@
             },
             {
               "problem_id": "S1-B",
-              "title": "코드 포매터 diff 헤더의 경로 정보 보존",
+              "title": "API 응답 필드의 기본값 생략 순서 수정",
               "source": "BugsInPy",
               "category": "bug_fixing",
-              "origin": "black/20",
+              "origin": "fastapi/10",
               "estimated_minutes": 10,
-              "description": "**사용 언어: Python**\n\n당신은 코드 포매터의 diff 출력 기능을 점검하고 있습니다. 이 기능은 수정 전과 수정 후의 파일 이름을 각각 diff 헤더에 표시합니다.\n\n서로 다른 디렉터리에 같은 파일명이 있을 수 있습니다. 예를 들어 `frontend/utils.py`와 `backend/utils.py`를 함께 처리하면, 파일명만 표시하는 헤더로는 어느 파일의 변경인지 구분할 수 없습니다. 헤더에는 입력으로 받은 경로 전체가 유지되어야 합니다.\n\n현재 구현은 경로에서 파일명만 꺼내 두 헤더를 만듭니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 원본과 수정본 헤더가 모두 전체 경로를 사용하도록 코드를 최소한으로 수정하세요. 반환 리스트의 첫 번째 원소는 원본 헤더, 두 번째 원소는 수정본 헤더입니다.",
+              "description": "**사용 언어: Python**\n\n당신은 API 응답을 만들기 전 필드를 선택·정규화하는 함수를 유지보수하고 있습니다. 각 `fields` 원소는 `name`(문자열), `value`(정수), `is_default`(bool) 키만 가집니다.\n\n`include`가 비어 있지 않으면 그 목록에 든 이름만 남겨야 하며, `exclude`에 든 이름은 항상 제외해야 합니다. `skip_defaults`가 `True`이면 기본값 필드(`is_default=True`)도 제외해야 합니다. 모든 조건을 통과한 필드는 입력 순서를 유지해 `{'name': ..., 'value': ...}` 형태로 반환합니다. 반환 결과에는 `is_default` 키를 포함하지 않습니다.\n\n현재 구현은 필드를 정규화하면서 `is_default` 정보를 먼저 버리고, 기본값 생략을 처리하지 않습니다. 함수의 이름과 입출력 인터페이스는 유지하면서, 기본값을 올바른 단계에서 제외하도록 최소 수정하세요. 입력 `fields`는 수정하지 않아야 합니다.",
               "function_signature": "",
-              "constraints": "- `src_path`는 빈 문자열이 아닌 POSIX 스타일 파일 경로\n- 경로에는 디렉터리가 하나 이상 포함된다"
+              "constraints": "- 필드 수는 1 이상 1,000 이하\n- `name`은 중복되지 않는다\n- `include`, `exclude`의 이름은 문자열"
             }
           ]
         }
